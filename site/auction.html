@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a09">
+<title>КИР — аукцион</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site/css/kir.css">
+<style>
+  .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; }
+  .bar .seg { min-width: 260px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 18px; }
+  .grid > .card { margin: 0; }
+  .lotc { text-align: left; padding: 0; overflow: hidden; cursor: pointer; color: var(--fg); font: inherit; width: 100%;
+          display: flex; flex-direction: column; justify-content: flex-start;
+          transition: transform .35s var(--ease), border-color .3s, box-shadow .35s; }
+  .lotc:hover { transform: translateY(-5px); border-color: var(--line-2); box-shadow: 0 24px 40px -20px rgba(0,0,0,.9); }
+  .lotc .pic { position: relative; aspect-ratio: 3/4; background: #050505; overflow: hidden; }
+  .lotc .pic img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--ease); }
+  .lotc:hover .pic img { transform: scale(1.04); }
+  .badge { position: absolute; left: 10px; top: 10px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+           padding: 5px 10px; border-radius: 999px; background: rgba(11,10,9,.78); backdrop-filter: blur(8px); border: 1px solid var(--line-2); }
+  .badge.live::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px;
+                        box-shadow: 0 0 0 0 rgba(232,64,47,.7); animation: pulse 1.6s infinite; vertical-align: 1px; }
+  .badge.me { left: auto; right: 10px; color: var(--ok); border-color: rgba(111,207,143,.4); }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(232,64,47,0); } 100% { box-shadow: 0 0 0 0 rgba(232,64,47,0); } }
+  .lotc .info { padding: 14px 16px 16px; }
+  .lotc .nm { font-family: var(--serif); font-style: italic; font-size: 21px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row2 { display: flex; justify-content: space-between; align-items: end; gap: 10px; margin-top: 10px; }
+  .row2 small { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .row2 b { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.02em; }
+  .row2 .t { text-align: right; }
+  .row2 .t b { font-family: ui-monospace, Consolas, monospace; font-size: 15px; letter-spacing: 0; }
+  .t.hot b { color: var(--accent-2); }
+  @media (max-width: 639px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .lotc .info { padding: 10px 12px 12px; }
+    .lotc .nm { font-size: 17px; }
+    .row2 { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .row2 .t { text-align: left; }
+    .row2 b { font-size: 15px; }
+    .badge { font-size: 9.5px; padding: 4px 8px; left: 6px; top: 6px; }
+    .badge.me { right: 6px; top: auto; bottom: 6px; }
+    .bar .seg { min-width: 0; flex: 1; }
+  }
+
+  /* окно лота */
+  .detail .frame { width: 100%; }
+  .big { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 40px); letter-spacing: -.03em; line-height: 1; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 14px; margin: 16px 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; }
+  .clock { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+  .clock div { background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .clock b { display: block; font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -.02em; }
+  .clock span { font-size: 11px; color: var(--muted); }
+  .bidrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+  .bidrow .input { font: 600 18px var(--sans); }
+  .quick { display: flex; gap: 6px; margin: 10px 0 14px; flex-wrap: wrap; }
+  .quick button { font: 600 13px var(--sans); color: var(--fg); background: rgba(255,255,255,.04); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .quick button:hover { border-color: var(--accent); }
+  .lead { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(111,207,143,.08); border: 1px solid rgba(111,207,143,.3); font-size: 14px; margin-bottom: 12px; }
+
+  /* программа ещё не выложена */
+  .soon { position: relative; border-radius: 22px; overflow: hidden; min-height: 440px; display: grid; place-items: center; padding: 24px 16px; }
+  .soon .wall { position: absolute; inset: -20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px;
+                transform: rotate(-4deg) scale(1.1); opacity: .3; mask-image: radial-gradient(ellipse at center, transparent 10%, #000 70%); }
+  .soon .wall img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 4px; }
+  .soon .card { position: relative; max-width: 480px; text-align: center; padding: 32px 24px; background: rgba(24, 22, 20, .88); backdrop-filter: blur(10px); }
+  .soon h2 { font-family: var(--display); font-weight: 600; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.02em; }
+  .soon p { margin: 10px 0 20px; }
+  .how3 { display: grid; gap: 10px; text-align: left; margin: 0 0 20px; }
+  .how3 div { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; color: var(--muted); }
+  .how3 b { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 13px; }
+</style>
+</head>
+<body data-page="auction">
+<main class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Торги · Solana</div>
+    <h1>Аукцион</h1>
+    <p>Работы КИР уходят тому, кто предложит больше. Ставки в SOL хранит программа в блокчейне — никто не может их забрать или подменить.</p>
+  </div>
+  <div class="bar" id="bar" hidden>
+    <div class="seg"><button id="f-live" class="on">Идут торги</button><button id="f-done">Завершены</button></div>
+    <button class="btn sm" id="reload">Обновить</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<script src="/site/js/config.js"></script>
+<script src="/site/js/kir-mint.js"></script>
+<script src="/site/js/ui.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const { esc, short, toast } = KIRUI;
+const AU = KIRMint.auction;
+let lots = [], art = new Map(), filter = 'live', timer = null;
+
+const now = () => Math.floor(Date.now() / 1000);
+const sol = l => AU.toSol(l).toLocaleString('ru-RU', { maximumFractionDigits: 4 });
+const left = l => l.endTs - now();
+function hms(s) {
+  if (s <= 0) return 'завершён';
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  const p = n => String(n).padStart(2, '0');
+  return d ? `${d} д ${p(h)}:${p(m)}` : `${p(h)}:${p(m)}:${p(x)}`;
+}
+const mine = a => KIRMint.owner && a && a.toBase58() === KIRMint.owner;
+
+// ---------- программа ещё не выложена ----------
+function notReady() {
+  $('bar').hidden = true;
+  $('list').innerHTML = `<div class="soon"><div class="wall" id="wall"></div>
+    <div class="card"><h2>Аукцион скоро откроется</h2>
+    <p class="muted">Программа торгов готова и проверена — осталось выложить её в сеть Solana.</p>
+    <div class="how3">
+      <div><b>1</b>Владелец NFT выставляет работу: стартовая цена, шаг и срок торгов.</div>
+      <div><b>2</b>Участники делают ставки в SOL. Перебитому участнику деньги возвращаются сразу.</div>
+      <div><b>3</b>Ставка в последние 5 минут продлевает торги — «выхватить» лот в последнюю секунду не выйдет.</div>
+      <div><b>4</b>После конца торгов NFT уходит победителю, SOL — продавцу.</div>
+    </div>
+    <a class="btn primary" href="/site/gallery.html">Смотреть галерею</a></div></div>`;
+  fetch('/remix/works/index.json').then(r => r.json()).then(all => {
+    $('wall').innerHTML = all.sort(() => Math.random() - 0.5).slice(0, 60).map(w => `<img src="/remix/works/t/${w.s}-${w.seed}.webp" alt="" loading="lazy">`).join('');
+  }).catch(() => {});
+}
+
+// ---------- список лотов ----------
+async function load() {
+  if (!(await AU.ready())) return notReady();
+  $('bar').hidden = false;
+  if (!lots.length) $('list').innerHTML = `<div class="grid">${Array.from({ length: 4 }, () => '<div class="card lotc"><div class="pic skeleton"></div><div class="info"><div class="skeleton" style="height:20px;border-radius:4px"></div></div></div>').join('')}</div>`;
+  try {
+    const [l, items] = await Promise.all([AU.lots(), art.size ? null : KIRMint.collectionAssets().catch(() => [])]);
+    lots = l.sort((a, b) => a.endTs - b.endTs);
+    if (items) items.forEach(n => art.set(n.address, n));
+  } catch (e) {
+    $('list').innerHTML = `<div class="card">Не удалось загрузить лоты: ${esc(e.message || e)}</div>`;
+    return;
+  }
+  render();
+  if (wanted) { const w = wanted; wanted = null; const l = lots.find(x => x.address.toBase58() === w); if (l) { if (left(l) <= 0) $("f-done").click(); showLot(w); } }
+}
+
+function render() {
+  const shown = lots.filter(l => (filter === 'live') === (left(l) > 0));
+  if (!shown.length) {
+    $('list').innerHTML = `<div class="card" style="text-align:center;padding:40px 20px">
+      <h2 style="font-family:var(--display);font-size:26px;letter-spacing:-.02em">${filter === 'live' ? 'Сейчас торгов нет' : 'Завершённых лотов нет'}</h2>
+      <p class="muted" style="margin:10px 0 18px">${filter === 'live' ? 'Выставить свою работу можно из галереи — открой NFT и нажми «Выставить на аукцион».' : 'Здесь появятся лоты, торги по которым закончились, но ещё не завершены.'}</p>
+      <a class="btn primary" href="/site/gallery.html">Открыть галерею</a></div>`;
+    return;
+  }
+  $('list').innerHTML = `<div class="grid">${shown.map(l => {
+    const n = art.get(l.asset.toBase58()), s = left(l);
+    const me = mine(l.highestBidder) ? 'лидируешь' : mine(l.seller) ? 'твой лот' : '';
+    return `<button class="card lotc rv" data-a="${l.address.toBase58()}">
+      <div class="pic">${n?.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}
+        <span class="badge ${s > 0 ? 'live' : ''}">${s > 0 ? 'идут торги' : 'ждёт завершения'}</span>
+        ${me ? `<span class="badge me">${me}</span>` : ''}</div>
+      <div class="info"><div class="nm">${esc(n?.name || 'Работа КИР')}</div>
+        <div class="row2"><div><small>${l.bidCount ? 'ставка' : 'старт'}</small><b>${sol(l.bidCount ? l.highestBid : l.minBid)} SOL</b></div>
+        <div class="t ${s > 0 && s < 3600 ? "hot" : ""}"><small>${l.bidCount} ${plural(l.bidCount)}</small><b data-end="${l.endTs}">${hms(s)}</b></div></div></div>
+    </button>`;
+  }).join('')}</div>`;
+}
+const plural = n => (n % 10 === 1 && n % 100 !== 11 ? 'ставка' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'ставки' : 'ставок');
+
+// таймеры тикают каждую секунду
+setInterval(() => {
+  document.querySelectorAll('[data-end]').forEach(el => { el.textContent = hms(+el.dataset.end - now()); });
+  if (open) open.tick();
+}, 1000);
+
+// ---------- окно лота ----------
+let open = null;
+$('list').onclick = e => { const b = e.target.closest('[data-a]'); if (b) showLot(b.dataset.a); };
+
+async function showLot(address) {
+  const l = lots.find(x => x.address.toBase58() === address);
+  if (!l) return;
+  const n = art.get(l.asset.toBase58()) || {};
+  const ended = left(l) <= 0, isSeller = mine(l.seller), leading = mine(l.highestBidder);
+  const min = AU.toSol(AU.nextMin(l)), step = AU.toSol(l.minIncrement);
+  const action = !KIRMint.owner ? `<button class="btn primary block" data-v="connect">Подключить Phantom, чтобы участвовать</button>`
+    : ended ? `<button class="btn primary block" id="settle">Завершить торги</button>
+        <p class="small muted" style="margin:10px 0 0">${l.bidCount ? 'NFT уйдёт победителю, SOL — продавцу.' : 'Ставок не было — NFT вернётся продавцу.'} Завершить может любой.</p>`
+    : isSeller ? (l.bidCount ? `<p class="muted small">Это твой лот. Снять его уже нельзя — на него есть ставки.</p>`
+        : `<p class="muted small">Это твой лот. Пока ставок нет, его можно снять с торгов.</p><button class="btn block" id="cancel">Снять с торгов</button>`)
+    : `${leading ? '<div class="lead">🏆 Твоя ставка лидирует. Можно поднять её ещё выше.</div>' : ''}
+       <div class="bidrow"><input class="input" id="amt" type="number" inputmode="decimal" min="${min}" step="${step}" value="${min}">
+       <span class="muted">SOL</span></div>
+       <div class="quick"><button data-q="0">мин. ${min}</button><button data-q="1">+${step}</button><button data-q="5">+${+(step * 5).toFixed(4)}</button></div>
+       <button class="btn primary block" id="bid">Сделать ставку</button>
+       <p class="small muted" style="margin:10px 0 0">Если тебя перебьют, SOL сразу вернутся на кошелёк.</p>`;
+
+  const p = KIRUI.sheet(`
+    <div class="detail"><div class="frame">${n.image ? `<img src="${esc(n.image)}" alt="">` : '<div class="empty">NFT</div>'}</div></div>
+    <div>
+      <div class="eyebrow">${ended ? 'Торги закончились' : 'Идут торги'}</div>
+      <h2 style="font-size:32px;font-style:italic">${esc(n.name || 'Работа КИР')}</h2>
+      <div style="margin-top:14px"><small class="muted small">${l.bidCount ? 'Текущая ставка' : 'Стартовая цена'}</small>
+        <div class="big">${sol(l.bidCount ? l.highestBid : l.minBid)} SOL</div></div>
+      <div class="clock" id="clk"></div>
+      <div id="act">${action}</div>
+      <dl class="kv">
+        <dt>Ставок</dt><dd>${l.bidCount}</dd>
+        ${l.bidCount ? `<dt>Лидер</dt><dd class="mono">${leading ? 'ты' : short(l.highestBidder.toBase58())}</dd>` : ''}
+        <dt>Шаг ставки</dt><dd>${sol(l.minIncrement)} SOL</dd>
+        <dt>Продавец</dt><dd class="mono">${isSeller ? 'ты' : short(l.seller.toBase58())}</dd>
+        <dt>Конец торгов</dt><dd>${new Date(l.endTs * 1000).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</dd>
+      </dl>
+      <div class="btns" style="flex-direction:column">
+        <a class="btn sm" href="${KIRMint.explorer(address)}" target="_blank">Лот в блокчейне</a>
+        <button class="btn ghost sm" data-v="close">Закрыть</button>
+      </div>
+    </div>`, 'two');
+
+  const clk = document.getElementById('clk');
+  open = { tick() {
+    const s = Math.max(0, left(l));
+    clk.innerHTML = [[Math.floor(s / 86400), 'дней'], [Math.floor(s % 86400 / 3600), 'часов'], [Math.floor(s % 3600 / 60), 'минут'], [s % 60, 'секунд']]
+      .map(([v, t]) => `<div><b>${String(v).padStart(2, '0')}</b><span>${t}</span></div>`).join('');
+  } };
+  open.tick();
+
+  const amt = document.getElementById('amt');
+  document.querySelectorAll('.quick [data-q]').forEach(b => b.onclick = () => {
+    const q = +b.dataset.q; amt.value = +(q ? Math.max(+amt.value || 0, min) + step * q : min).toFixed(4);
+  });
+  const act = (id, label, fn, ok) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Подтверди в Phantom…';
+      try { await fn(); toast(ok, 'ok'); document.querySelector('.sheet-bg')?.click(); await load(); }
+      catch (e) { toast(esc(e.message || e), 'err', 8000); b.disabled = false; b.textContent = label; }
+    };
+  };
+  act('bid', 'Сделать ставку', async () => {
+    const v = +amt.value;
+    if (!(v >= min)) throw new Error(`Ставка должна быть не меньше ${min} SOL`);
+    await AU.bid(address, v);
+  }, 'Ставка принята!');
+  act('settle', 'Завершить торги', () => AU.settle(address), 'Торги завершены');
+  act('cancel', 'Снять с торгов', () => AU.cancel(address), 'Лот снят, NFT вернулся к тебе');
+
+  const v = await p;
+  open = null;
+  if (v === 'connect') { await KIRUI.connect(); load(); }
+}
+
+$('f-live').onclick = () => { filter = 'live'; $('f-live').classList.add('on'); $('f-done').classList.remove('on'); render(); };
+$('f-done').onclick = () => { filter = 'done'; $('f-done').classList.add('on'); $('f-live').classList.remove('on'); render(); };
+$('reload').onclick = load;
+
+KIRUI.ready.then(() => {
+  load();
+  KIRMint.onChange(() => lots.length && render());
+  timer = setInterval(() => { if (!document.hidden && !open) load(); }, 20000);
+});
+// открыть конкретный лот по ссылке /site/auction.html#<адрес лота> (один раз, когда лоты загрузятся)
+let wanted = location.hash.length > 30 ? location.hash.slice(1) : null;
+</script>
+</body>
+</html>

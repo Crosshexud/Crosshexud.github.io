@@ -8,3 +8,10 @@ site/art/
 mint/node_modules/
 dist/
 .wrangler/
+
+# ключи служебного кошелька и сборка программы аукциона — не выкладывать
+auction/keys/
+auction/**/target/
+auction/tests/node_modules/
+auction/sim/target/
+auction/sim/fixtures/*.so

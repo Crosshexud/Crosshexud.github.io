@@ -1,0 +1,22 @@
+[package]
+name = "kir_auction_sim"
+version = "0.1.0"
+edition = "2021"
+description = "Проверка программы аукциона КИР в LiteSVM (локальная копия блокчейна внутри теста)"
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+litesvm = "0.18"
+solana-address = { version = "2", features = ["curve25519", "decode"] }
+solana-keypair = "3"
+solana-signer = "3"
+solana-transaction = "4"
+solana-message = "4"
+solana-instruction = "3"
+solana-clock = "3"
+solana-account = "4"
+solana-transaction-error = "3"
+solana-instruction-error = "2"
+solana-system-interface = "3"

@@ -7,6 +7,8 @@ import {
   mplCore, create, createCollection, fetchCollection, fetchAssetsByCollection, fetchCollectionsByUpdateAuthority, ruleSet,
 } from '@metaplex-foundation/mpl-core';
 import { generateSigner, createGenericFile, publicKey } from '@metaplex-foundation/umi';
+import * as web3 from '@solana/web3.js';
+import { makeAuction, explainError, LAMPORTS } from '../../auction/client/kir-auction.js';
 
 const RPC = 'https://api.devnet.solana.com';
 const CLUSTER = 'devnet';
@@ -158,9 +160,66 @@ async function collectionAssets(addr = savedCollection()) {
   return items.reverse();
 }
 
+// ---------- аукцион (программа auction/program; адрес — в site/js/config.js) ----------
+const conn = new web3.Connection(RPC, 'confirmed');
+const A = makeAuction(web3, window.KIR_CONFIG?.auctionProgram || 'HmsxX4gHaGzr8eWTPVXNYYN5Ye5RFRWW6VtuwTD8WP6');
+const toLamports = sol => BigInt(Math.round(Number(sol) * LAMPORTS));
+const toSol = lamports => Number(lamports) / LAMPORTS;
+
+// подписать в Phantom и отправить одну команду
+async function sendIx(ix) {
+  const p = phantom();
+  if (!owner || !p) throw new Error('Подключи кошелёк Phantom');
+  const tx = new web3.Transaction().add(ix);
+  tx.feePayer = new web3.PublicKey(owner);
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+  tx.recentBlockhash = blockhash;
+  try {
+    const signed = await p.signTransaction(tx);
+    const signature = await conn.sendRawTransaction(signed.serialize());
+    await conn.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+    return signature;
+  } catch (e) {
+    const text = explainError(e);
+    throw text ? new Error(text) : e;
+  }
+}
+
+const me = () => new web3.PublicKey(owner);
+const lotOf = async address => {
+  const lot = await A.fetchOne(conn, address);
+  if (!lot) throw new Error('Лот уже закрыт');
+  return lot;
+};
+
+const auction = {
+  programId: A.PID.toBase58(),
+  toSol, toLamports,
+  // программа уже выложена в сеть?
+  async ready() {
+    try { return (await conn.getAccountInfo(A.PID))?.executable === true; } catch { return false; }
+  },
+  lots: () => A.fetchAll(conn),
+  lot: address => A.fetchOne(conn, address),
+  addressOf: asset => A.pda(new web3.PublicKey(asset)).toBase58(),
+  nextMin: lot => A.nextMin(lot),
+  // выставить свой NFT: цены в SOL, длительность в секундах
+  create: ({ asset, collection, minBid, step, duration }) => sendIx(A.create({
+    seller: me(), asset: new web3.PublicKey(asset), collection: collection ? new web3.PublicKey(collection) : null,
+    minBid: toLamports(minBid), minIncrement: toLamports(step), duration,
+  })),
+  // ставка: сначала перечитываем лот — вдруг кто-то уже перебил
+  async bid(address, sol) {
+    const lot = await lotOf(address);
+    return sendIx(A.bid({ bidder: me(), auction: lot, amount: toLamports(sol) }));
+  },
+  settle: async address => sendIx(A.settle({ payer: me(), auction: await lotOf(address) })),
+  cancel: async address => sendIx(A.cancel({ seller: me(), auction: await lotOf(address) })),
+};
+
 window.KIRMint = {
   connect, autoConnect, disconnect, balance, getCollection, createKirCollection, mint, collectionAssets,
-  explorer, savedCollection, setCollection,
+  explorer, savedCollection, setCollection, auction,
   get owner() { return owner; },
   onChange(f) { listeners.add(f); return () => listeners.delete(f); },
   cluster: CLUSTER,

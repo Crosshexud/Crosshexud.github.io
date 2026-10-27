@@ -2,6 +2,7 @@
 // Страница ставит <body data-page="home|create|remix|gallery"> и подключает kir-mint.js перед этим файлом.
 window.KIRUI = (() => {
   const ICONS = {
+    auction: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5l6 6M12 6l6 6M10.5 7.5l6 6-3 3-6-6zM9 15l-6 6M3 21h9"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
     create: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="4"/></svg>',
     remix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>',
@@ -14,6 +15,7 @@ window.KIRUI = (() => {
     { id: 'remix', href: '/remix/', label: 'Генератор' },
     { id: 'create', href: '/site/index.html', label: 'Создать NFT' },
     { id: 'gallery', href: '/site/gallery.html', label: 'Галерея' },
+    { id: 'auction', href: '/site/auction.html', label: 'Аукцион' },
   ];
   const page = document.body.dataset.page;
   const short = a => a.slice(0, 4) + '…' + a.slice(-4);
@@ -115,12 +117,13 @@ window.KIRUI = (() => {
   const ready = KIRMint.autoConnect();
 
   // ---------- окно-лист: возвращает data-v нажатой кнопки ----------
-  function sheet(html, cls = '') {
+  // setup(box) — подготовить поля окна; тогда ответ { v, box }, чтобы прочитать введённое после закрытия
+  function sheet(html, cls = '', setup = null) {
     return new Promise(res => {
       const bg = document.createElement('div');
       bg.className = 'sheet-bg open';
       bg.innerHTML = `<div class="sheet ${cls}"><div class="grab"></div>${html}</div>`;
-      const close = v => { bg.remove(); document.removeEventListener('keydown', onKey); res(v); };
+      const close = v => { bg.remove(); document.removeEventListener('keydown', onKey); res(setup ? { v, box: bg } : v); };
       const onKey = e => { if (e.key === 'Escape') close(null); };
       bg.onclick = e => {
         if (e.target === bg) return close(null);
@@ -129,6 +132,7 @@ window.KIRUI = (() => {
       };
       document.addEventListener('keydown', onKey);
       document.body.append(bg);
+      if (setup) setup(bg);
     });
   }
 

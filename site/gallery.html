@@ -42,6 +42,9 @@
   .soon .eyebrow { justify-content: center; }
   .soon h2 { font-family: var(--display); font-weight: 600; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.02em; }
   .soon p { margin: 10px 0 20px; }
+  .tile .pic { position: relative; }
+  .tag { position: absolute; left: 8px; top: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+         padding: 4px 9px; border-radius: 999px; background: var(--accent); color: #fff; }
 </style>
 </head>
 <body data-page="gallery">
@@ -63,7 +66,7 @@
 <script src="/site/js/ui.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const { esc, short } = KIRUI;
+const { esc, short, toast } = KIRUI;
 let items = [];
 
 function skeleton(n = 8) {
@@ -100,17 +103,52 @@ async function load() {
   }
   $('count').textContent = items.length ? `Работ: ${items.length}` : '';
   if (!items.length) return empty();
+  auctionReady = await AU.ready();
   $('grid').innerHTML = items.map((n, i) => `
     <button class="tile" data-i="${i}">
-      <div class="pic">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}</div>
-      <div class="cap"><b>${esc(n.name)}</b><span>${n.owner === KIRMint.owner ? 'твоя' : 'владелец ' + short(n.owner)}</span></div>
+      <div class="pic">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}${onAuction(n) ? '<span class="tag">на аукционе</span>' : ''}</div>
+      <div class="cap"><b>${esc(n.name)}</b><span>${onAuction(n) ? 'идут торги' : n.owner === KIRMint.owner ? 'твоя' : 'владелец ' + short(n.owner)}</span></div>
     </button>`).join('');
+}
+
+// ---------- аукцион: NFT на торгах принадлежит счёту лота ----------
+const AU = KIRMint.auction;
+let auctionReady = false;
+const onAuction = n => n.owner === AU.addressOf(n.address);
+
+async function sell(n) {
+  const v = await KIRUI.sheet(`
+    <div><div class="eyebrow">Аукцион</div><h3 style="font-size:28px;margin-bottom:6px">Выставить «${esc(n.name)}»</h3>
+    <p class="muted small" style="margin:0 0 16px">NFT перейдёт на хранение программе аукциона. Если ставок не будет — вернётся тебе.</p>
+    <label class="field"><span>Стартовая цена, SOL</span><input class="input" id="s-min" type="number" inputmode="decimal" min="0.001" step="0.01" value="0.1"></label>
+    <label class="field"><span>Шаг ставки, SOL</span><input class="input" id="s-step" type="number" inputmode="decimal" min="0.001" step="0.01" value="0.05"></label>
+    <div class="field"><span>Сколько идут торги</span><div class="seg" id="s-dur">
+      <button type="button" data-d="3600">1 час</button><button type="button" data-d="86400" class="on">1 день</button>
+      <button type="button" data-d="259200">3 дня</button><button type="button" data-d="604800">7 дней</button></div></div>
+    <div class="btns" style="flex-direction:column;margin-top:18px">
+      <button class="btn primary" data-v="go">Выставить на аукцион</button>
+      <button class="btn ghost" data-v="close">Отмена</button></div></div>`, '', box => {
+        box.querySelectorAll('#s-dur [data-d]').forEach(b => b.onclick = () => {
+          box.querySelectorAll('#s-dur [data-d]').forEach(x => x.classList.toggle('on', x === b));
+        });
+      });
+  if (v?.v !== 'go') return;
+  const min = +v.box.querySelector('#s-min').value, step = +v.box.querySelector('#s-step').value;
+  const duration = +v.box.querySelector('#s-dur .on').dataset.d;
+  if (!(min >= 0.001) || !(step >= 0.001)) return toast('Цена и шаг — не меньше 0.001 SOL', 'err');
+  toast('Подтверди в Phantom…');
+  try {
+    await AU.create({ asset: n.address, collection: KIRMint.savedCollection(), minBid: min, step, duration });
+    toast('Работа выставлена на аукцион!', 'ok');
+    location.href = '/site/auction.html#' + AU.addressOf(n.address);
+  } catch (e) { toast('Не получилось: ' + esc(e.message || e), 'err', 9000); }
 }
 
 $('grid').onclick = e => {
   const t = e.target.closest('.tile[data-i]');
   if (!t) return;
   const n = items[+t.dataset.i];
+  const mine = n.owner === KIRMint.owner, lot = onAuction(n);
   KIRUI.sheet(`
     <div class="detail">${n.image ? `<img src="${esc(n.image)}" alt="">` : ''}</div>
     <div>
@@ -119,15 +157,17 @@ $('grid').onclick = e => {
       ${n.description ? `<p class="muted">${esc(n.description)}</p>` : ''}
       <div class="chips">${n.attributes.map(a => `<span class="chip">${esc(a.trait_type)}: <b>${esc(a.value)}</b></span>`).join('')}</div>
       <dl class="kv">
-        <dt>Владелец</dt><dd class="mono">${n.owner === KIRMint.owner ? 'ты' : short(n.owner)}</dd>
+        <dt>Владелец</dt><dd class="mono">${lot ? 'аукцион (идут торги)' : mine ? 'ты' : short(n.owner)}</dd>
         <dt>Адрес NFT</dt><dd class="mono">${short(n.address)}</dd>
       </dl>
       <div class="btns" style="flex-direction:column">
+        ${lot ? `<a class="btn primary" href="/site/auction.html#${n.owner}">Перейти к торгам</a>` : ''}
+        ${mine && auctionReady ? '<button class="btn primary" data-v="sell">Выставить на аукцион</button>' : ''}
         <a class="btn" href="${KIRMint.explorer(n.address)}" target="_blank">Запись в блокчейне</a>
         ${n.image ? `<a class="btn" href="${esc(n.image)}" target="_blank">Оригинал картинки</a>` : ''}
         <button class="btn ghost" data-v="close">Закрыть</button>
       </div>
-    </div>`, 'two');
+    </div>`, 'two').then(v => { if (v === 'sell') sell(n); });
 };
 
 $('reload').onclick = load;

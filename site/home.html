@@ -93,6 +93,21 @@
   .how h3 { font-family: var(--sans); font-size: 18px; font-weight: 600; margin-bottom: 6px; }
   .how p { margin: 0; color: var(--muted); font-size: 15px; }
 
+  /* аукцион */
+  .auc { display: grid; gap: 20px; align-items: center; text-decoration: none; color: var(--fg); padding: 28px 24px; overflow: hidden; transition: border-color .3s; }
+  @media (min-width: 820px) { .auc { grid-template-columns: 1.4fr 1fr; padding: 40px; } }
+  .auc:hover { border-color: var(--line-2); }
+  .auc h2 { font-family: var(--display); font-weight: 600; font-size: clamp(26px, 4.6vw, 42px); letter-spacing: -.025em; }
+  .auc p { color: var(--muted); max-width: 520px; margin: 12px 0 18px; }
+  .auc .go { color: var(--accent-2); font-weight: 600; }
+  /* «молоток»: три полосы ставок растут одна за другой */
+  .gavel { display: flex; align-items: end; gap: 14px; height: 160px; justify-content: center; }
+  .gavel span { width: 46px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, var(--accent-2), var(--accent)); animation: grow 3.6s var(--ease) infinite; }
+  .gavel span:nth-child(1) { height: 40%; opacity: .45; }
+  .gavel span:nth-child(2) { height: 70%; opacity: .7; animation-delay: .25s; }
+  .gavel span:nth-child(3) { height: 100%; animation-delay: .5s; box-shadow: 0 0 40px -6px rgba(232,64,47,.8); }
+  @keyframes grow { 0%, 100% { transform: scaleY(.85); transform-origin: bottom; } 50% { transform: scaleY(1); transform-origin: bottom; } }
+
   /* финальный призыв */
   .cta { position: relative; overflow: hidden; border-radius: 24px; background: var(--accent); color: #fff; padding: 44px 24px; text-align: center; }
   .cta::before { content: ""; position: absolute; width: 340px; height: 340px; border-radius: 50%; background: #0b0a09; right: -120px; top: -150px; opacity: .9; }
@@ -157,6 +172,16 @@
       <div class="card rv" style="--d:.1s"><h3>Хранилище помнит навсегда</h3><p>Картинка и описание сохраняются в Arweave — их нельзя удалить или подменить.</p></div>
       <div class="card rv" style="--d:.2s"><h3>NFT становится твоим</h3><p>Работа записывается в блокчейн Solana и лежит в кошельке Phantom. Автор получает 5% с перепродаж.</p></div>
     </div>
+  </section>
+
+  <section class="sec">
+    <a class="card auc rv" href="/site/auction.html">
+      <div><div class="eyebrow">Торги</div>
+        <h2>Аукцион КИР</h2>
+        <p>Работы уходят тому, кто предложит больше. Ставки хранит программа в блокчейне, перебитым участникам деньги возвращаются сразу, а ставка в последние 5 минут продлевает торги.</p>
+        <span class="go">Смотреть лоты →</span></div>
+      <div class="gavel" aria-hidden="true"><span></span><span></span><span></span></div>
+    </a>
   </section>
 
   <section class="sec cta rv">
