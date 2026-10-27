@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d0c0b">
+<meta name="theme-color" content="#0b0a09">
 <title>КИР — галерея</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site/css/kir.css">
 <style>
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -26,6 +27,21 @@
   .detail img { border-radius: 12px; width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #050505; }
   .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin: 14px 0; }
   .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .tile { transition: transform .35s var(--ease), border-color .3s, box-shadow .35s; }
+  .tile:hover { transform: translateY(-5px); border-color: var(--line-2); box-shadow: 0 24px 40px -20px rgba(0,0,0,.9); }
+  .tile .pic { overflow: hidden; }
+  .tile .pic img { transition: transform .6s var(--ease); }
+  .tile:hover .pic img { transform: scale(1.04); }
+  /* пустая галерея: карточка поверх приглушённой стены работ */
+  .soon { grid-column: 1 / -1; position: relative; border-radius: 22px; overflow: hidden; min-height: 460px; display: grid; place-items: center; padding: 24px 16px; }
+  .soon .wall { position: absolute; inset: -20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px;
+                transform: rotate(-4deg) scale(1.1); opacity: .32; filter: saturate(.8);
+                mask-image: radial-gradient(ellipse at center, transparent 10%, #000 70%); }
+  .soon .wall img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 4px; }
+  .soon .card { position: relative; max-width: 460px; text-align: center; padding: 32px 24px; background: rgba(24, 22, 20, .86); backdrop-filter: blur(10px); }
+  .soon .eyebrow { justify-content: center; }
+  .soon h2 { font-family: var(--display); font-weight: 600; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.02em; }
+  .soon p { margin: 10px 0 20px; }
 </style>
 </head>
 <body data-page="gallery">
@@ -57,10 +73,16 @@ function skeleton(n = 8) {
 
 function empty() {
   $('count').textContent = '';
-  $('grid').innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:36px 18px">
-    <h2 style="font-size:28px;margin-bottom:6px">Скоро здесь появятся работы</h2>
-    <p class="muted" style="margin:0 0 ${KIRUI.PUBLIC ? 0 : 16}px">Коллекция «КИР» готовится.</p>
-    ${KIRUI.PUBLIC ? '' : '<a class="btn primary" href="/remix/">Создать первый NFT</a>'}</div>`;
+  $('grid').innerHTML = `<div class="soon"><div class="wall" id="wall"></div>
+    <div class="card">
+    <h2>Скоро здесь появятся работы</h2>
+    <p class="muted">Первые NFT коллекции уже готовятся. А пока — посмотри, что умеет генератор.</p>
+    ${KIRUI.PUBLIC ? '' : '<a class="btn primary" href="/remix/">Создать первый NFT</a>'}</div></div>`;
+  // за карточкой — приглушённая стена из работ генератора (на открытой версии их может не быть — тогда просто без стены)
+  fetch('/remix/works/index.json').then(r => r.json()).then(all => {
+    const pick = all.sort(() => Math.random() - 0.5).slice(0, 60);
+    $('wall').innerHTML = pick.map(w => `<img src="/remix/works/t/${w.s}-${w.seed}.webp" alt="" loading="lazy">`).join('');
+  }).catch(() => {});
 }
 
 async function load() {

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a09">
+<title>КИР — новые работы авангарда</title>
+<meta name="description" content="Алгоритм собирает новые работы из картин автора КИР. Каждая — единственная и навсегда записана в блокчейне Solana.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site/css/kir.css">
+<style>
+  /* ---------- первый экран ---------- */
+  .intro { display: grid; gap: 36px; align-items: center; padding: 12px 0 28px; }
+  @media (min-width: 900px) { .intro { grid-template-columns: 1.05fr 1fr; gap: 48px; min-height: calc(100dvh - 140px); padding: 0; } }
+  .intro h1 { font-family: var(--display); font-weight: 700; font-size: clamp(42px, 11vw, 96px); line-height: .95; letter-spacing: -.035em; margin: 0; }
+  .intro h1 em { display: block; font-family: var(--serif); font-style: italic; font-weight: 600; letter-spacing: -.01em;
+                 font-size: .62em; color: var(--accent-2); margin-top: .12em; }
+  .intro .lead { color: var(--muted); font-size: clamp(16px, 2.2vw, 19px); max-width: 520px; margin: 22px 0 28px; }
+  .intro .btns { max-width: 460px; }
+
+  /* стопка работ, сменяются сами */
+  .stack { position: relative; width: min(78vw, 400px); aspect-ratio: 3 / 4; margin: 10px auto 20px; }
+  .stack::before { /* красный круг за картинами */
+    content: ""; position: absolute; width: 78%; aspect-ratio: 1; border-radius: 50%; background: var(--accent);
+    right: -16%; top: -9%; filter: saturate(1.1); animation: float 9s ease-in-out infinite; }
+  .stack::after { /* чёрная диагональ */
+    content: ""; position: absolute; left: -22%; bottom: 12%; width: 70%; height: 14px; background: var(--fg);
+    transform: rotate(-24deg); opacity: .9; }
+  .stack .frame { position: absolute; inset: 0; transition: transform 1s var(--ease), opacity 1s var(--ease); }
+  .stack .frame:nth-child(1) { transform: rotate(-7deg) translate(-9%, 4%); opacity: .55; }
+  .stack .frame:nth-child(2) { transform: rotate(5deg) translate(8%, 2%); opacity: .75; }
+  .stack .frame:nth-child(3) { transform: rotate(-1deg); z-index: 2; }
+  .stack .frame:nth-child(3) { animation: pop .9s var(--ease); }
+  @keyframes pop { from { opacity: 0; transform: rotate(-1deg) translateY(30px) scale(.95); } }
+  @keyframes float { 50% { transform: translate(-6px, 10px); } }
+
+  /* ---------- бегущие ленты работ ---------- */
+  .marquee { overflow: hidden; margin: 8px -16px; padding: 10px 0; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  @media (min-width: 820px) { .marquee { margin-inline: 0; } }
+  .marquee .row { display: flex; gap: 14px; width: max-content; animation: run 70s linear infinite; }
+  .marquee .row + .row { margin-top: 14px; animation-direction: reverse; animation-duration: 80s; }
+  .marquee:hover .row { animation-play-state: paused; }
+  .marquee a { flex: none; width: clamp(120px, 17vw, 180px); aspect-ratio: 3 / 4; border-radius: 6px; overflow: hidden; background: #050505;
+               box-shadow: 0 0 0 1px var(--line); transition: transform .35s var(--ease), box-shadow .35s; }
+  .marquee a:hover { transform: translateY(-6px) rotate(-1.5deg); box-shadow: 0 0 0 2px var(--accent), 0 18px 30px -12px rgba(0,0,0,.9); }
+  .marquee img { width: 100%; height: 100%; object-fit: cover; }
+  @keyframes run { to { transform: translateX(-50%); } }
+
+  /* ---------- цифры ---------- */
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 48px 0; }
+  @media (min-width: 820px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+  .stats div { padding: 22px 20px; border: 1px solid var(--line); margin: -1px 0 0 -1px; }
+  .stats b { display: block; font-family: var(--display); font-weight: 600; font-size: clamp(30px, 5vw, 44px); letter-spacing: -.03em; line-height: 1; }
+  .stats b.red { color: var(--accent); }
+  .stats span { color: var(--muted); font-size: 14px; }
+
+  /* ---------- секции ---------- */
+  .sec { margin: 72px 0; }
+  .sec-h { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 24px; }
+  .sec-h h2 { font-family: var(--display); font-weight: 600; font-size: clamp(26px, 4.6vw, 42px); letter-spacing: -.025em; line-height: 1.05; }
+  .sec-h p { color: var(--muted); margin: 0; max-width: 420px; }
+
+  /* две серии */
+  .series { display: grid; gap: 16px; }
+  @media (min-width: 820px) { .series { grid-template-columns: 1fr 1fr; gap: 20px; } }
+  .ser { display: grid; grid-template-columns: 1fr; text-decoration: none; color: var(--fg); padding: 0; overflow: hidden; transition: border-color .3s, transform .3s var(--ease); }
+  .ser:hover, .rv-on .ser.rv.in:hover { border-color: var(--line-2); transform: translateY(-4px); }
+  .ser .fan { position: relative; height: 250px; overflow: hidden; }
+  .ser.modi .fan { background: linear-gradient(180deg, #e9e3d8, #d9d2c5); }
+  .ser.vg .fan { background: linear-gradient(180deg, #2a1d18, #1a1311); }
+  .ser .fan img { position: absolute; width: 150px; aspect-ratio: 3 / 4; object-fit: cover; left: 50%; top: 34px; border-radius: 4px;
+                  box-shadow: 0 18px 30px -10px rgba(0,0,0,.7); transition: transform .5s var(--ease); }
+  .ser .fan img:nth-child(1) { transform: translateX(-125%) rotate(-10deg); }
+  .ser .fan img:nth-child(2) { transform: translateX(-50%) translateY(-8px); z-index: 1; }
+  .ser .fan img:nth-child(3) { transform: translateX(25%) rotate(10deg); }
+  .ser:hover .fan img:nth-child(1) { transform: translateX(-140%) rotate(-14deg); }
+  .ser:hover .fan img:nth-child(3) { transform: translateX(40%) rotate(14deg); }
+  .ser .txt { padding: 20px 22px 22px; }
+  .ser h3 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -.02em; }
+  .ser h3 small { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--muted); font-weight: 600; letter-spacing: 0; margin-left: 6px; }
+  .ser p { color: var(--muted); margin: 8px 0 14px; font-size: 15px; }
+  .ser .go { color: var(--accent-2); font-weight: 600; font-size: 15px; }
+
+  /* как это работает */
+  .how { display: grid; gap: 14px; counter-reset: s; }
+  @media (min-width: 820px) { .how { grid-template-columns: repeat(3, 1fr); gap: 20px; } }
+  .how .card { padding: 24px; }
+  .how .card::before { counter-increment: s; content: "0" counter(s); display: block; font-family: var(--display); font-weight: 700;
+                       font-size: 44px; letter-spacing: -.04em; color: transparent; -webkit-text-stroke: 1.5px var(--accent); margin-bottom: 14px; }
+  .how h3 { font-family: var(--sans); font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .how p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  /* финальный призыв */
+  .cta { position: relative; overflow: hidden; border-radius: 24px; background: var(--accent); color: #fff; padding: 44px 24px; text-align: center; }
+  .cta::before { content: ""; position: absolute; width: 340px; height: 340px; border-radius: 50%; background: #0b0a09; right: -120px; top: -150px; opacity: .9; }
+  .cta::after { content: ""; position: absolute; width: 180px; height: 180px; background: var(--paper); left: -60px; bottom: -70px; transform: rotate(18deg); opacity: .9; }
+  .cta > * { position: relative; z-index: 1; }
+  .cta h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 5.5vw, 50px); letter-spacing: -.03em; line-height: 1.02; }
+  .cta p { margin: 12px auto 24px; max-width: 460px; color: rgba(255,255,255,.85); }
+  .cta .btn { background: #0b0a09; color: #fff; border-color: transparent; min-width: 240px; }
+  .cta .btn:hover:not(:disabled) { background: #1d1a17; }
+</style>
+</head>
+<body data-page="home">
+<main class="wrap">
+  <section class="intro">
+    <div>
+      <div class="eyebrow rv">Аукционный дом авангарда · Solana</div>
+      <h1 class="rv" style="--d:.08s">Новые работы <em>из картин КИР</em></h1>
+      <p class="lead rv" style="--d:.16s">Алгоритм разбирает картины автора на мозаику, калейдоскоп, коллаж и разлом — и собирает из них новые. Каждая работа единственная и навсегда записывается в блокчейн.</p>
+      <div class="btns rv" style="--d:.24s">
+        <a class="btn primary" href="/remix/">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>
+          Открыть генератор</a>
+        <a class="btn" href="/site/gallery.html">Смотреть галерею</a>
+      </div>
+    </div>
+    <div class="stack rv" id="stack" style="--d:.2s">
+      <div class="frame skeleton"></div><div class="frame skeleton"></div><div class="frame skeleton"></div>
+    </div>
+  </section>
+
+  <div class="marquee rv" id="marquee"><div class="row"></div><div class="row"></div></div>
+
+  <div class="stats rv">
+    <div><b>4</b><span>картины автора в основе</span></div>
+    <div><b>4</b><span>техники: мозаика, калейдоскоп, коллаж, разлом</span></div>
+    <div><b>2</b><span>серии: «Ван Гог» и «Моди»</span></div>
+    <div><b class="red">∞</b><span>новых работ — ни одна не повторяется</span></div>
+  </div>
+
+  <section class="sec">
+    <div class="sec-h rv"><h2>Две серии</h2><p>Масло и карандаш. Алгоритм бережно сохраняет почерк автора, но каждый раз собирает его заново.</p></div>
+    <div class="series">
+      <a class="card ser vg rv" id="ser-vg" href="/remix/">
+        <div class="fan"></div>
+        <div class="txt"><h3>Ван Гог <small>масло</small></h3>
+          <p>Насыщенные цвета и фактура мазка из картин «Иллюзии» (2021) и «Василиса» (2019).</p>
+          <span class="go">Создать работу →</span></div>
+      </a>
+      <a class="card ser modi rv" id="ser-modi" href="/remix/" style="--d:.1s">
+        <div class="fan"></div>
+        <div class="txt"><h3>Моди <small>карандаш</small></h3>
+          <p>Графит и штриховка из рисунков 2024 и 2025 годов — мозаика и дерево.</p>
+          <span class="go">Создать работу →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h rv"><h2>Как это работает</h2><p>Без сложностей: три шага от идеи до NFT в твоём кошельке.</p></div>
+    <div class="how">
+      <div class="card rv"><h3>Генератор собирает работу</h3><p>Нажимаешь «Новая» — алгоритм выбирает технику и строит работу из картин автора.</p></div>
+      <div class="card rv" style="--d:.1s"><h3>Хранилище помнит навсегда</h3><p>Картинка и описание сохраняются в Arweave — их нельзя удалить или подменить.</p></div>
+      <div class="card rv" style="--d:.2s"><h3>NFT становится твоим</h3><p>Работа записывается в блокчейн Solana и лежит в кошельке Phantom. Автор получает 5% с перепродаж.</p></div>
+    </div>
+  </section>
+
+  <section class="sec cta rv">
+    <h2>Собери свою<br>первую работу</h2>
+    <p>Нажми «Новая» столько раз, сколько захочешь, — и оставь себе ту, что зацепит.</p>
+    <a class="btn" href="/remix/">Открыть генератор →</a>
+  </section>
+</main>
+
+<script src="/site/js/config.js"></script>
+<script src="/site/js/kir-mint.js"></script>
+<script src="/site/js/ui.js"></script>
+<script>
+// работы для витрины берём из набора генератора
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const name = w => `${w.s}-${w.seed}`;
+const thumb = w => `/remix/works/t/${name(w)}.webp`;
+const link = w => `/remix/#${name(w)}`;
+
+fetch('/remix/works/index.json').then(r => r.json()).then(all => {
+  const list = shuffle(all.slice());
+  const of = s => list.filter(w => w.s === s);
+
+  // стопка на первом экране: верхняя карточка уходит назад, приходит новая
+  const stack = document.getElementById('stack');
+  let pos = 0;
+  const frame = w => `<a class="frame" href="${link(w)}" title="«${w.title}»"><img src="/remix/works/${name(w)}.webp" alt="«${w.title}»"></a>`;
+  stack.innerHTML = list.slice(0, 3).map(frame).join('');
+  pos = 3;
+  setInterval(() => {
+    if (document.hidden) return;
+    const next = list[pos++ % list.length], img = new Image();
+    img.onload = () => {
+      stack.firstElementChild.remove();
+      stack.insertAdjacentHTML('beforeend', frame(next));
+    };
+    img.src = `/remix/works/${name(next)}.webp`;
+  }, 3800);
+
+  // две ленты: каждая повторена дважды, чтобы бежала без шва
+  const rows = document.querySelectorAll('#marquee .row');
+  [list.slice(3, 17), list.slice(17, 31)].forEach((part, i) => {
+    const html = part.map(w => `<a href="${link(w)}" title="«${w.title}»"><img src="${thumb(w)}" alt="" loading="lazy"></a>`).join('');
+    rows[i].innerHTML = html + html;
+  });
+
+  // веер из трёх работ на карточке серии
+  for (const s of ['vg', 'modi']) {
+    const three = of(s).slice(0, 3), card = document.getElementById('ser-' + s);
+    card.querySelector('.fan').innerHTML = three.map(w => `<img src="${thumb(w)}" alt="">`).join('');
+    card.href = link(three[1]);
+  }
+});
+</script>
+</body>
+</html>

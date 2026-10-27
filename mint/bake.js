@@ -26,7 +26,7 @@ const rand = () => { a = (a * 1103515245 + 12345) % 2147483648; return a; };
     const s = i % 2 ? 'modi' : 'vg';
     let seed; do seed = rand() % 1e9; while (used.has(s + seed)); used.add(s + seed);
     const w = await page.evaluate((s, seed) => {
-      series = s; draw(seed);
+      window.NO_REVEAL = true; series = s; draw(seed);
       return { ...current, data: canvas.toDataURL('image/webp', 0.75) };
     }, s, seed);
     fs.writeFileSync(path.join(OUT, `${s}-${seed}.webp`), Buffer.from(w.data.split(',')[1], 'base64'));

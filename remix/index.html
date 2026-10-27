@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d0c0b">
+<meta name="theme-color" content="#0b0a09">
 <title>КИР — генератор</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site/css/kir.css">
 <style>
   .layout { display: grid; gap: 16px; }
@@ -28,7 +29,15 @@
   .hist button.on { border-color: var(--accent); }
   .hist img { width: 100%; height: 100%; object-fit: cover; }
   .file-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .hero h1 { font-size: clamp(28px, 6vw, 46px); }
+  @media (min-width: 820px) { .art .frame { width: min(100%, calc((100dvh - 340px) * .75)); } }
+  .keys { margin: 14px 0 0; }
+  kbd { font: 600 11px var(--sans); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; color: var(--fg); background: rgba(255,255,255,.04); }
+  #author { display: block; margin: 14px auto 0; background: none; border: 0; color: var(--muted); }
+  #author:hover { color: var(--fg); }
+  @media (max-width: 819px), (hover: none) { .keys { display: none; } }
   @media (max-width: 819px) {
+    .plate { display: none; } /* на телефоне название и так в карточке ниже */
     .hero p { display: none; }
     .hero { margin-bottom: 12px; }
     .main-btns { display: none; } /* на телефоне те же кнопки в панели снизу */
@@ -45,6 +54,7 @@
   <div class="layout">
     <section class="art">
       <div class="frame" id="frame"><canvas id="c" width="900" height="1200"></canvas><span class="swipe">смахни — новая работа</span></div>
+      <div class="plate"><b id="plateT">&nbsp;</b><span id="plateS">КИР</span></div>
     </section>
     <section>
       <div class="card">
@@ -64,12 +74,13 @@
           <button class="btn sm" id="save">Скачать PNG</button>
           <button class="btn sm" id="meta">Метаданные</button>
         </div>
+        <p class="keys small muted"><kbd>Пробел</kbd> — новая работа · <kbd>←</kbd> — предыдущая</p>
       </div>
       <div class="card">
         <div class="muted small" style="margin-bottom:10px">Недавние работы</div>
         <div class="hist" id="hist"></div>
       </div>
-      <button class="btn sm" id="author" style="opacity:.6">🔒 Режим автора</button>
+      <button class="btn sm" id="author">🔒 Режим автора</button>
     </section>
   </div>
 </main>
@@ -294,23 +305,62 @@ function draw(seed) {
   finish(s);
 
   describe({ seed, series, title: `${pick(WORDS_A)} ${pick(WORDS_B)}`, tech });
+  reveal();
 }
 
 // готовая работа из набора: картинка уже нарисована заранее (mint/bake.js)
+let nextUp = null; // следующая работа подгружается заранее — появляется без ожидания
 function showWork(seed) {
   const w = SET.find(w => w.s === series && w.seed === seed) || SET.find(w => w.s === series);
   return new Promise(res => {
     const im = new Image();
-    im.onload = () => { ctx.drawImage(im, 0, 0, W, H); describe({ seed: w.seed, series: w.s, title: w.title, tech: w.tech }); res(); };
+    im.onload = () => {
+      ctx.drawImage(im, 0, 0, W, H); describe({ seed: w.seed, series: w.s, title: w.title, tech: w.tech }); reveal(); res();
+      nextUp = randomOf(series);
+      new Image().src = `works/${series}-${nextUp}.webp`;
+    };
     im.onerror = res;
     im.src = `works/${w.s}-${w.seed}.webp`;
   });
+}
+function randomOf(s) {
+  const own = SET.filter(w => w.s === s && !(current && w.seed === current.seed));
+  return own[Math.floor(Math.random() * own.length)].seed;
+}
+
+// «сборка» на глазах: готовая картина проявляется клетками в случайном порядке
+let revealing = null;
+function reveal() {
+  revealing = null; // прошлая сборка, если шла, останавливается сама
+  if (window.NO_REVEAL || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const snap = snapshot(), N = 9, M = 12, cw = W / N, ch = H / M;
+  const cells = Array.from({ length: N * M }, (_, i) => i).sort(() => Math.random() - 0.5);
+  ctx.fillStyle = SERIES[current.series].paper; ctx.fillRect(0, 0, W, H);
+  const t0 = performance.now(), dur = 650;
+  let done = 0;
+  const job = revealing = { snap };
+  (function step(t) {
+    if (revealing !== job) return;
+    const k = Math.min(1, (t - t0) / dur), upto = Math.floor((1 - (1 - k) ** 2) * cells.length);
+    for (; done < upto; done++) {
+      const c = cells[done], x = (c % N) * cw, y = Math.floor(c / N) * ch;
+      ctx.drawImage(snap, x, y, cw, ch, x, y, cw, ch);
+    }
+    if (k < 1) requestAnimationFrame(step); else revealing = null;
+  })(t0);
+}
+// дорисовать сразу (перед скачиванием или созданием NFT)
+function stopReveal() {
+  if (!revealing) return;
+  ctx.drawImage(revealing.snap, 0, 0); revealing = null;
 }
 
 function describe(work) {
   current = work;
   const s = SERIES[work.series];
   document.getElementById("title").textContent = `«${work.title}»`;
+  document.getElementById("plateT").textContent = `«${work.title}»`;
+  document.getElementById("plateS").textContent = `КИР · ${s.name} · ${work.tech}`;
   const chip = (k, v) => `<span class="chip">${k}: <b>${v}</b></span>`;
   document.getElementById("traits").innerHTML = chip("серия", s.name) + chip("техника", work.tech) +
     chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) + chip("зерно", work.seed);
@@ -347,8 +397,7 @@ function redraw(seed) {
 
 function newSeed() {
   if (!SET) return Math.floor(Math.random() * 1e9);
-  const own = SET.filter(w => w.s === series && !(current && w.seed === current.seed));
-  return own[Math.floor(Math.random() * own.length)].seed;
+  return nextUp && SET.some(w => w.s === series && w.seed === nextUp) ? nextUp : randomOf(series);
 }
 function download(name, url) {
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
@@ -369,7 +418,17 @@ document.getElementById("s-modi").onclick = () => { series = "modi"; redraw(newS
   });
   f.addEventListener("click", () => redraw(newSeed()));
 })();
-document.getElementById("save").onclick = () => download(`${fileBase()}.png`, canvas.toDataURL("image/png"));
+// клавиатура: пробел или → — новая работа, ← — предыдущая
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea") || document.getElementById("lock").style.display === "flex") return;
+  if (e.key === " " && e.target.closest("button, a")) return; // пробел на кнопке и так её нажимает
+  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); redraw(newSeed()); }
+  if (e.key === "ArrowLeft") {
+    const i = HIST.findIndex(h => h.key === `${current.series}-${current.seed}`), h = HIST[i + 1];
+    if (h) { series = h.series; redraw(h.seed); }
+  }
+});
+document.getElementById("save").onclick = () => { stopReveal(); download(`${fileBase()}.png`, canvas.toDataURL("image/png")); };
 // метаданные в формате Metaplex (Solana) — понадобятся при создании NFT
 function metadata() {
   const s = SERIES[current.series];
@@ -395,10 +454,11 @@ document.getElementById("meta").onclick = () => {
 document.getElementById("nft").onclick = () => {
   if (!window.KIRPending) return alert("Открой генератор через сервер: http://localhost:8080/remix/");
   document.getElementById("nft").disabled = true;
+  stopReveal();
   canvas.toBlob(async blob => {
     const meta = metadata(); delete meta.image; delete meta.properties;
     await KIRPending.put({ bytes: new Uint8Array(await blob.arrayBuffer()), contentType: "image/png", fileName: `${fileBase()}.png`, metadata: meta });
-    location.href = "/";
+    location.href = "/site/index.html";
   }, "image/png");
 };
 

@@ -1,7 +1,8 @@
 // Общие части всех страниц: шапка, нижнее меню, кнопка кошелька, всплывающие сообщения.
-// Страница ставит <body data-page="create|remix|gallery"> и подключает kir-mint.js перед этим файлом.
+// Страница ставит <body data-page="home|create|remix|gallery"> и подключает kir-mint.js перед этим файлом.
 window.KIRUI = (() => {
   const ICONS = {
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
     create: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="4"/></svg>',
     remix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>',
     gallery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
@@ -9,8 +10,9 @@ window.KIRUI = (() => {
   const PUBLIC = !!window.KIR_CONFIG?.public;
   // на открытом сайте генератора и создания нет — только галерея
   const PAGES = PUBLIC ? [{ id: 'gallery', href: '/', label: 'Галерея' }] : [
+    { id: 'home', href: '/', label: 'Главная' },
     { id: 'remix', href: '/remix/', label: 'Генератор' },
-    { id: 'create', href: '/', label: 'Создать NFT' },
+    { id: 'create', href: '/site/index.html', label: 'Создать NFT' },
     { id: 'gallery', href: '/site/gallery.html', label: 'Галерея' },
   ];
   const page = document.body.dataset.page;
@@ -34,6 +36,28 @@ window.KIRUI = (() => {
   tabs.innerHTML = PAGES.map(p => `<a href="${p.href}" class="${p.id === page ? 'on' : ''}">${ICONS[p.id]}<span>${p.label}</span></a>`).join('');
   if (PUBLIC) document.body.classList.add('public'); // одна вкладка — нижнее меню не нужно
   else document.body.append(tabs);
+
+  // подвал (на странице генератора не нужен — там всё в один экран)
+  if (page !== 'remix') {
+    const foot = document.createElement('footer');
+    foot.className = 'foot';
+    foot.innerHTML = `<div class="wrap">
+      <a class="logo" href="/">К<span>И</span>Р</a>
+      <nav>${PAGES.map(p => `<a href="${p.href}">${p.label}</a>`).join('')}</nav>
+      <p>Новые работы из картин автора · Solana · ${new Date().getFullYear()}</p></div>`;
+    document.body.append(foot);
+  }
+
+  // плавное появление блоков с классом .rv при прокрутке
+  if ('IntersectionObserver' in window) {
+    document.documentElement.classList.add('rv-on');
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }), { rootMargin: '0px 0px -8% 0px' });
+    const watch = () => document.querySelectorAll('.rv:not(.in)').forEach(el => io.observe(el));
+    watch();
+    new MutationObserver(watch).observe(document.body, { childList: true, subtree: true });
+  }
 
   const toastBox = document.createElement('div');
   toastBox.className = 'toasts';
