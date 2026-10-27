@@ -1,0 +1,34 @@
+{
+  "name": "mint",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/kir-mint.js --bundle --minify --format=iife --platform=browser --target=firefox115 --inject:src/shims.js --define:global=globalThis --alias:stream=stream-browserify --alias:crypto=crypto-browserify --alias:vm=vm-browserify --outfile=../site/js/kir-mint.js",
+    "start": "node server.js",
+    "pack": "node pack.js",
+    "deploy": "node pack.js && wrangler pages deploy ../dist --project-name kir-gallery --branch main --commit-dirty=true"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@metaplex-foundation/mpl-core": "^1.10.0",
+    "@metaplex-foundation/umi": "^1.6.0",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.6.0",
+    "@metaplex-foundation/umi-signer-wallet-adapters": "^1.6.0",
+    "@metaplex-foundation/umi-uploader-irys": "^1.6.0",
+    "buffer": "^6.0.3",
+    "esbuild": "^0.28.2"
+  },
+  "devDependencies": {
+    "crypto-browserify": "^3.12.1",
+    "events": "^3.3.0",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5",
+    "vm-browserify": "^1.1.2",
+    "wrangler": "^4.153.0"
+  }
+}

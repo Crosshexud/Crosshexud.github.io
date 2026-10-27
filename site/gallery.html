@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0c0b">
+<title>КИР — галерея</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/css/kir.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 640px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+  @media (min-width: 1000px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; } }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer;
+          text-align: left; padding: 0; color: var(--fg); font: inherit; transition: transform .15s, border-color .15s; }
+  .tile:hover { transform: translateY(-3px); border-color: #4a423a; }
+  .tile .pic { aspect-ratio: 3/4; background: #050505; }
+  .tile .pic img { width: 100%; height: 100%; object-fit: cover; }
+  .tile .cap { padding: 10px 12px 12px; }
+  .tile .cap b { font-family: var(--serif); font-size: 18px; font-weight: 600; display: block; line-height: 1.2;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .cap span { font-size: 12px; color: var(--muted); }
+  .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; }
+  .detail img { border-radius: 12px; width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #050505; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin: 14px 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+</style>
+</head>
+<body data-page="gallery">
+<main class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Коллекция «КИР»</div>
+    <h1>Галерея</h1>
+    <p>Все NFT коллекции — прямо из блокчейна Solana.</p>
+  </div>
+  <div class="bar">
+    <span class="muted small" id="count"></span>
+    <button class="btn sm" id="reload">Обновить</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script src="/site/js/config.js"></script>
+<script src="/site/js/kir-mint.js"></script>
+<script src="/site/js/ui.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const { esc, short } = KIRUI;
+let items = [];
+
+function skeleton(n = 8) {
+  $('grid').innerHTML = Array.from({ length: n }, () =>
+    `<div class="tile"><div class="pic skeleton"></div><div class="cap"><b class="skeleton" style="height:18px;border-radius:4px">&nbsp;</b></div></div>`).join('');
+}
+
+function empty() {
+  $('count').textContent = '';
+  $('grid').innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:36px 18px">
+    <h2 style="font-size:28px;margin-bottom:6px">Скоро здесь появятся работы</h2>
+    <p class="muted" style="margin:0 0 ${KIRUI.PUBLIC ? 0 : 16}px">Коллекция «КИР» готовится.</p>
+    ${KIRUI.PUBLIC ? '' : '<a class="btn primary" href="/remix/">Создать первый NFT</a>'}</div>`;
+}
+
+async function load() {
+  skeleton();
+  $('count').textContent = 'Загружаю из блокчейна…';
+  // адрес коллекции знает этот браузер; если нет — найдём по подключённому кошельку
+  if (!KIRMint.savedCollection()) await KIRMint.getCollection();
+  if (!KIRMint.savedCollection()) return empty();
+  try {
+    items = await KIRMint.collectionAssets();
+  } catch (e) {
+    $('count').textContent = '';
+    $('grid').innerHTML = `<div class="card" style="grid-column:1/-1">Не удалось загрузить: ${esc(e.message || e)}</div>`;
+    return;
+  }
+  $('count').textContent = items.length ? `Работ: ${items.length}` : '';
+  if (!items.length) return empty();
+  $('grid').innerHTML = items.map((n, i) => `
+    <button class="tile" data-i="${i}">
+      <div class="pic">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}</div>
+      <div class="cap"><b>${esc(n.name)}</b><span>${n.owner === KIRMint.owner ? 'твоя' : 'владелец ' + short(n.owner)}</span></div>
+    </button>`).join('');
+}
+
+$('grid').onclick = e => {
+  const t = e.target.closest('.tile[data-i]');
+  if (!t) return;
+  const n = items[+t.dataset.i];
+  KIRUI.sheet(`
+    <div class="detail">${n.image ? `<img src="${esc(n.image)}" alt="">` : ''}</div>
+    <div>
+      <div class="eyebrow">КИР</div>
+      <h2 style="font-size:34px">${esc(n.name)}</h2>
+      ${n.description ? `<p class="muted">${esc(n.description)}</p>` : ''}
+      <div class="chips">${n.attributes.map(a => `<span class="chip">${esc(a.trait_type)}: <b>${esc(a.value)}</b></span>`).join('')}</div>
+      <dl class="kv">
+        <dt>Владелец</dt><dd class="mono">${n.owner === KIRMint.owner ? 'ты' : short(n.owner)}</dd>
+        <dt>Адрес NFT</dt><dd class="mono">${short(n.address)}</dd>
+      </dl>
+      <div class="btns" style="flex-direction:column">
+        <a class="btn" href="${KIRMint.explorer(n.address)}" target="_blank">Запись в блокчейне</a>
+        ${n.image ? `<a class="btn" href="${esc(n.image)}" target="_blank">Оригинал картинки</a>` : ''}
+        <button class="btn ghost" data-v="close">Закрыть</button>
+      </div>
+    </div>`, 'two');
+};
+
+$('reload').onclick = load;
+KIRUI.ready.then(() => { load(); KIRMint.onChange(o => { if (o) load(); }); });
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+// Настройки сайта. Для открытой версии pack.js записывает сюда public: true.
+window.KIR_CONFIG = {
+  public: false, // true — открытый сайт: только галерея, без генератора и создания NFT
+  author: '62vdChKaBEvtCDXLHzuT6M7pgs3RUW8AXet7VLT8EJJB', // кошелёк автора: по нему галерея находит коллекцию «КИР»
+};

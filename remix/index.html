@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0c0b">
+<title>КИР — генератор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/css/kir.css">
+<style>
+  .layout { display: grid; gap: 16px; }
+  @media (min-width: 820px) {
+    .layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+    .art { position: sticky; top: 90px; }
+  }
+  .frame { position: relative; cursor: pointer; touch-action: pan-y; }
+  .frame canvas { transition: opacity .25s; }
+  .frame.busy canvas { opacity: .35; }
+  .swipe { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #fff;
+           background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 999px; pointer-events: none; }
+  @media (hover: hover) { .swipe { display: none; } }
+  .title { font-family: var(--serif); font-style: italic; font-size: clamp(28px, 6vw, 40px); margin: 0 0 10px; }
+  .hist { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+  .hist button { flex: none; width: 58px; aspect-ratio: 3/4; padding: 0; border: 2px solid transparent; border-radius: 8px;
+                 overflow: hidden; background: #050505; cursor: pointer; scroll-snap-align: start; }
+  .hist button.on { border-color: var(--accent); }
+  .hist img { width: 100%; height: 100%; object-fit: cover; }
+  .file-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  @media (max-width: 819px) {
+    .hero p { display: none; }
+    .hero { margin-bottom: 12px; }
+    .main-btns { display: none; } /* на телефоне те же кнопки в панели снизу */
+  }
+</style>
+</head>
+<body data-page="remix" class="has-dock">
+<main class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Генератор</div>
+    <h1>Новые работы КИР</h1>
+    <p>Алгоритм собирает новую работу из картин автора. Каждая — единственная: её «зерно» записано в адресе страницы.</p>
+  </div>
+  <div class="layout">
+    <section class="art">
+      <div class="frame" id="frame"><canvas id="c" width="900" height="1200"></canvas><span class="swipe">смахни — новая работа</span></div>
+    </section>
+    <section>
+      <div class="card">
+        <div class="seg" style="margin-bottom:16px">
+          <button id="s-vg">Ван Гог · масло</button>
+          <button id="s-modi">Моди · карандаш</button>
+        </div>
+        <h2 class="title" id="title">загружаю картины…</h2>
+        <div class="chips" id="traits"></div>
+        <div class="btns main-btns" style="margin-top:18px">
+          <button class="btn" id="next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>
+            Новая работа</button>
+          <button class="btn primary" id="nft">Создать NFT →</button>
+        </div>
+        <div class="file-btns" style="margin-top:16px">
+          <button class="btn sm" id="save">Скачать PNG</button>
+          <button class="btn sm" id="meta">Метаданные</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="muted small" style="margin-bottom:10px">Недавние работы</div>
+        <div class="hist" id="hist"></div>
+      </div>
+    </section>
+  </div>
+</main>
+<div class="dock">
+  <button class="btn" onclick="document.getElementById('next').click()">↻ Новая</button>
+  <button class="btn primary" id="nft2" onclick="document.getElementById('nft').click()">Создать NFT →</button>
+</div>
+
+<script src="/site/js/config.js"></script>
+<script src="/site/js/kir-mint.js"></script>
+<script src="/site/js/ui.js"></script>
+<script src="art.js"></script><!-- только дома: на GitHub этого файла нет, там зашифрованный art.enc.json -->
+<div id="lock" style="display:none;position:fixed;inset:0;z-index:50;background:var(--bg);align-items:center;justify-content:center;padding:16px">
+  <form class="card" id="lockForm" style="max-width:360px;width:100%">
+    <div class="eyebrow">Закрытая мастерская</div>
+    <p class="muted small">Картины автора зашифрованы. Введи пароль, чтобы открыть генератор.</p>
+    <input id="lockPass" class="input" type="password" placeholder="Пароль" autocomplete="current-password">
+    <p class="small" id="lockMsg" style="color:var(--accent-2);min-height:1.2em"></p>
+    <button class="btn primary" style="width:100%">Открыть</button>
+  </form>
+</div>
+<script src="/site/js/pending.js"></script>
+<script>
+// ---------- случайность по зерну: одно и то же зерно = одна и та же работа ----------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let R;
+const rnd = (a = 1, b) => b === undefined ? R() * a : a + R() * (b - a);
+const pick = arr => arr[Math.floor(R() * arr.length)];
+
+// ---------- исходные картины и серии ----------
+const SOURCES = {
+  illyuzii:    { title: "Иллюзии", year: 2021 },
+  vasilisa:    { title: "Василиса", year: 2019 },
+  pomehi:      { title: "Без названия (мозаика)", year: 2024 },
+  znamenosets: { title: "Без названия (дерево)", year: 2025 },
+};
+const SERIES = {
+  vg:   { name: "Ван Гог", sources: ["illyuzii", "vasilisa"], gray: false, paper: "#1a1714" },
+  modi: { name: "Моди", sources: ["pomehi", "znamenosets"], gray: true, paper: "#eeeae2" },
+};
+const IMG = {};
+
+const W = 900, H = 1200;
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+// случайный кусок картины с нужными пропорциями; zoom > 1 — крупнее план
+function region(img, aspect, zMin, zMax) {
+  const z = rnd(zMin, zMax);
+  let w = img.width / z, h = w / aspect;
+  if (h > img.height / z) { h = img.height / z; w = h * aspect; }
+  return { x: rnd(0, img.width - w), y: rnd(0, img.height - h), w, h };
+}
+function drawCover(img, zMin, zMax) {
+  const r = region(img, W / H, zMin, zMax);
+  ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, W, H);
+}
+function snapshot() {
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  c.getContext("2d").drawImage(canvas, 0, 0); return c;
+}
+
+// ---------- техники ----------
+function mosaic(s, srcs) {
+  drawCover(IMG[pick(srcs)], 1, 1.8);
+  const cell = pick([20, 24, 30, 36]);
+  const vertical = R() < 0.3;
+  let bx = 0, by = 0, bw = W, bh = H;
+  if (vertical) { bw = Math.round(rnd(0.3, 0.5) * W / cell) * cell; bx = Math.round(rnd(0, W - bw) / cell) * cell; }
+  else { bh = Math.round(rnd(0.25, 0.45) * H / cell) * cell; by = Math.round(rnd(0.15, 0.85) * (H - bh) / cell) * cell; }
+  const cols = Math.ceil(bw / cell), rows = Math.ceil(bh / cell);
+  const sharp = ctx.getImageData(bx, by, bw, bh);
+  // уменьшаем полосу до размера сетки — получаем средний цвет каждой клетки
+  const small = document.createElement("canvas"); small.width = cols; small.height = rows;
+  const sc = small.getContext("2d"); sc.drawImage(canvas, bx, by, bw, bh, 0, 0, cols, rows);
+  const avg = sc.getImageData(0, 0, cols, rows).data;
+  ctx.fillStyle = s.gray ? "#f1ede4" : "#e8e0d0"; ctx.fillRect(bx, by, bw, bh);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const x = bx + i * cell, y = by + j * cell, k = (j * cols + i) * 4, r = R();
+    if (r < 0.06) { ctx.putImageData(sharp, bx, by, i * cell, j * cell, cell, cell); continue; } // «окошко» в оригинал
+    if (r < 0.3) continue; // пустая клетка
+    const col = `rgb(${avg[k]},${avg[k + 1]},${avg[k + 2]})`;
+    if (s.gray) { // штриховка карандашом
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+      const lines = Math.floor(rnd(5, 11));
+      for (let n = 0; n < lines; n++) {
+        const t = (n + 0.5) / lines * cell;
+        ctx.beginPath(); ctx.moveTo(x + 2, y + t); ctx.lineTo(x + t, y + 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + t, y + cell - 2); ctx.lineTo(x + cell - 2, y + t); ctx.stroke();
+      }
+    } else {
+      ctx.globalAlpha = rnd(0.7, 1); ctx.fillStyle = col;
+      ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2); ctx.globalAlpha = 1;
+    }
+  }
+  ctx.strokeStyle = "rgba(0,0,0,.15)"; ctx.lineWidth = 1; // тонкая сетка
+  for (let i = 0; i <= cols; i++) { ctx.beginPath(); ctx.moveTo(bx + i * cell, by); ctx.lineTo(bx + i * cell, by + bh); ctx.stroke(); }
+  for (let j = 0; j <= rows; j++) { ctx.beginPath(); ctx.moveTo(bx, by + j * cell); ctx.lineTo(bx + bw, by + j * cell); ctx.stroke(); }
+}
+
+function kaleido(s, srcs) {
+  const img = IMG[pick(srcs)];
+  const N = pick([6, 8, 10, 12]), a = Math.PI * 2 / N;
+  const framed = R() < 0.5; // как калейдоскоп в «Василисе»: круг на фоне картины
+  const cx = W / 2, cy = framed ? rnd(0.35, 0.6) * H : H / 2;
+  const r = framed ? rnd(0.3, 0.44) * W : Math.hypot(W, H) / 2;
+  if (framed) {
+    drawCover(img, 1, 1.5);
+    ctx.fillStyle = s.gray ? "rgba(238,234,226,.45)" : "rgba(10,8,6,.45)"; ctx.fillRect(0, 0, W, H);
+  }
+  const reg = region(img, 1, 1.5, 3.5);
+  for (let i = 0; i < N; i++) {
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(i * a); if (i % 2) ctx.scale(1, -1);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -a / 2 - 0.01, a / 2 + 0.01); ctx.closePath(); ctx.clip();
+    ctx.drawImage(img, reg.x, reg.y, reg.w, reg.h, 0, -r / 2, r, r);
+    ctx.restore();
+  }
+  if (framed) { // оправа
+    ctx.lineWidth = rnd(14, 28); ctx.strokeStyle = s.gray ? "#555" : "#6c7a73";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.5)";
+    ctx.beginPath(); ctx.arc(cx, cy, r + ctx.lineWidth * 4, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function shapePath(shape, w, h) {
+  ctx.beginPath();
+  if (shape === "circle") ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+  else if (shape === "arch") { // арка, как в архитектуре «Иллюзий»
+    ctx.moveTo(-w / 2, h / 2); ctx.lineTo(-w / 2, -h / 2 + w / 2);
+    ctx.arc(0, -h / 2 + w / 2, w / 2, Math.PI, 0); ctx.lineTo(w / 2, h / 2); ctx.closePath();
+  } else ctx.rect(-w / 2, -h / 2, w, h);
+}
+
+function collage(s, srcs) {
+  drawCover(IMG[pick(srcs)], 1, 1.4);
+  ctx.fillStyle = s.paper; ctx.globalAlpha = 0.6; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  const n = Math.floor(rnd(5, 10));
+  for (let i = 0; i < n; i++) {
+    const img = IMG[pick(srcs)], shape = pick(["rect", "rect", "circle", "arch"]);
+    const fw = rnd(0.25, 0.55) * W, fh = shape === "circle" ? fw : fw * rnd(0.8, 1.6);
+    const reg = region(img, fw / fh, 1.5, 4);
+    ctx.save();
+    ctx.translate(rnd(0.1, 0.9) * W, rnd(0.1, 0.9) * H); ctx.rotate(rnd(-0.15, 0.15));
+    ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 25; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 10;
+    ctx.fillStyle = s.gray ? "#f6f3ec" : "#e9e1cf";
+    ctx.save(); ctx.scale((fw + 16) / fw, (fh + 16) / fh); shapePath(shape, fw, fh); ctx.fill(); ctx.restore();
+    ctx.shadowColor = "transparent";
+    shapePath(shape, fw, fh); ctx.clip();
+    ctx.drawImage(img, reg.x, reg.y, reg.w, reg.h, -fw / 2, -fh / 2, fw, fh);
+    ctx.restore();
+  }
+}
+
+function rift(s, srcs) {
+  drawCover(IMG[pick(srcs)], 1, 1.6);
+  const snap = snapshot(), vertical = R() < 0.5, len = vertical ? W : H, dim = vertical ? H : W;
+  let p = 0;
+  while (p < len) {
+    const t = Math.floor(rnd(10, 90));
+    if (R() < 0.6) {
+      const off = Math.floor(rnd(-0.12, 0.12) * dim), wrap = off - Math.sign(off) * dim;
+      if (vertical) { ctx.drawImage(snap, p, 0, t, H, p, off, t, H); ctx.drawImage(snap, p, 0, t, H, p, wrap, t, H); }
+      else { ctx.drawImage(snap, 0, p, W, t, off, p, W, t); ctx.drawImage(snap, 0, p, W, t, wrap, p, W, t); }
+    }
+    p += t;
+  }
+  if (!s.gray) { // сдвиг красного канала на нескольких полосах
+    for (let i = 0; i < 4; i++) {
+      const y = Math.floor(rnd(H - 80)), h = Math.floor(rnd(20, 80)), k = Math.floor(rnd(8, 30));
+      const im = ctx.getImageData(0, y, W, h), d = im.data;
+      for (let row = 0; row < h; row++) for (let x = W - 1; x >= k; x--) {
+        const i4 = (row * W + x) * 4; d[i4] = d[i4 - k * 4];
+      }
+      ctx.putImageData(im, 0, y);
+    }
+  }
+}
+
+// зерно; для «Моди» ещё и перевод в графит
+function finish(s) {
+  const img = ctx.getImageData(0, 0, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = (R() - 0.5) * 18;
+    if (s.gray) {
+      const v = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] + g;
+      d[i] = v + 4; d[i + 1] = v + 2; d[i + 2] = v - 2;
+    } else { d[i] += g; d[i + 1] += g; d[i + 2] += g; }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+const TECHNIQUES = { "Мозаика": mosaic, "Калейдоскоп": kaleido, "Коллаж": collage, "Разлом": rift };
+
+// ---------- названия ----------
+const WORDS_A = ["Сон", "Отражение", "Шум", "Память", "Осколок", "Двойник", "Эхо", "Тень", "Сад", "Голос", "Иллюзия", "Колыбель"];
+const WORDS_B = ["скрипки", "башни", "младенца", "знаменосца", "слона", "дерева", "маски", "города", "стекла", "лестницы", "арки", "бабочки"];
+
+// ---------- главная функция ----------
+let series = "vg", current = null;
+function draw(seed) {
+  R = mulberry32(seed);
+  for (let i = 0; i < 8; i++) R(); // разгон: у близких зёрен первые числа почти одинаковые
+  const s = SERIES[series];
+  const tech = pick(Object.keys(TECHNIQUES));
+  ctx.save(); ctx.globalAlpha = 1; ctx.fillStyle = s.paper; ctx.fillRect(0, 0, W, H);
+  TECHNIQUES[tech](s, s.sources);
+  ctx.restore();
+  finish(s);
+
+  const title = `${pick(WORDS_A)} ${pick(WORDS_B)}`;
+  current = { seed, series, title, tech };
+  document.getElementById("title").textContent = `«${title}»`;
+  const chip = (k, v) => `<span class="chip">${k}: <b>${v}</b></span>`;
+  document.getElementById("traits").innerHTML = chip("серия", s.name) + chip("техника", tech) +
+    chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) + chip("зерно", seed);
+  history.replaceState(null, "", `#${series}-${seed}`);
+  document.getElementById("s-vg").classList.toggle("on", series === "vg");
+  document.getElementById("s-modi").classList.toggle("on", series === "modi");
+  remember();
+}
+
+// ---------- недавние работы: маленькие копии, по нажатию — вернуть ----------
+const HIST = [];
+function remember() {
+  const key = `${current.series}-${current.seed}`;
+  if (!HIST.some(h => h.key === key)) {
+    const t = document.createElement("canvas"); t.width = 120; t.height = 160;
+    t.getContext("2d").drawImage(canvas, 0, 0, 120, 160);
+    HIST.unshift({ key, series: current.series, seed: current.seed, src: t.toDataURL("image/jpeg", 0.7) });
+    HIST.length = Math.min(HIST.length, 16);
+  }
+  document.getElementById("hist").innerHTML = HIST.map((h, i) =>
+    `<button data-i="${i}" class="${h.key === key ? "on" : ""}"><img src="${h.src}" alt=""></button>`).join("");
+}
+document.getElementById("hist").onclick = e => {
+  const b = e.target.closest("button[data-i]"); if (!b) return;
+  const h = HIST[+b.dataset.i]; series = h.series; redraw(h.seed);
+};
+
+// рисование занимает долю секунды — даём экрану показать затемнение
+function redraw(seed) {
+  const f = document.getElementById("frame");
+  f.classList.add("busy");
+  setTimeout(() => { draw(seed); f.classList.remove("busy"); }, 30);
+}
+
+function newSeed() { return Math.floor(Math.random() * 1e9); }
+function download(name, url) {
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+}
+const fileBase = () => `kir-${current.series}-${current.seed}`;
+
+document.getElementById("next").onclick = () => redraw(newSeed());
+document.getElementById("s-vg").onclick = () => { series = "vg"; redraw(newSeed()); };
+document.getElementById("s-modi").onclick = () => { series = "modi"; redraw(newSeed()); };
+// нажатие на картину или смахивание пальцем — новая работа
+(() => {
+  const f = document.getElementById("frame");
+  let x0 = null;
+  f.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+  f.addEventListener("touchend", e => {
+    if (x0 !== null && Math.abs(e.changedTouches[0].clientX - x0) > 50) redraw(newSeed());
+    x0 = null;
+  });
+  f.addEventListener("click", () => redraw(newSeed()));
+})();
+document.getElementById("save").onclick = () => download(`${fileBase()}.png`, canvas.toDataURL("image/png"));
+// метаданные в формате Metaplex (Solana) — понадобятся при создании NFT
+function metadata() {
+  const s = SERIES[current.series];
+  return {
+    name: current.title,
+    symbol: "KIR",
+    description: `Новая работа серии «КИР: ${s.name}», созданная алгоритмом на основе картин автора КИР.`,
+    image: `${fileBase()}.png`,
+    attributes: [
+      { trait_type: "Серия", value: `КИР: ${s.name}` },
+      { trait_type: "Техника", value: current.tech },
+      { trait_type: "Основа", value: s.sources.map(k => SOURCES[k].title).join(", ") },
+      { trait_type: "Зерно", value: String(current.seed) },
+    ],
+    properties: { category: "image", files: [{ uri: `${fileBase()}.png`, type: "image/png" }] },
+  };
+}
+document.getElementById("meta").onclick = () => {
+  const blob = new Blob([JSON.stringify(metadata(), null, 2)], { type: "application/json" });
+  download(`${fileBase()}.json`, URL.createObjectURL(blob));
+};
+// передаём работу в мастерскую NFT (работает, когда страница открыта через сервер: http://localhost:8080/remix/)
+document.getElementById("nft").onclick = () => {
+  if (!window.KIRPending) return alert("Открой генератор через сервер: http://localhost:8080/remix/");
+  document.getElementById("nft").disabled = true;
+  canvas.toBlob(async blob => {
+    const meta = metadata(); delete meta.image; delete meta.properties;
+    await KIRPending.put({ bytes: new Uint8Array(await blob.arrayBuffer()), contentType: "image/png", fileName: `${fileBase()}.png`, metadata: meta });
+    location.href = "/";
+  }, "image/png");
+};
+
+// картины: дома — из art.js, на сайте — расшифровка art.enc.json паролем (?lock — проверить пароль дома)
+async function unlock(pass) {
+  const enc = await (await fetch("art.enc.json")).json();
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(enc.salt), iterations: enc.iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.data)); // неверный пароль → ошибка
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+function loadArt() {
+  if (typeof ART !== "undefined" && !/[?&]lock\b/.test(location.search)) return Promise.resolve(ART);
+  return new Promise(done => {
+    const lock = document.getElementById("lock"), form = document.getElementById("lockForm");
+    const input = document.getElementById("lockPass"), msg = document.getElementById("lockMsg");
+    const tryPass = async pass => {
+      msg.textContent = "Открываю…";
+      try {
+        const art = await unlock(pass);
+        try { sessionStorage.setItem("kir-pass", pass); } catch {}
+        lock.style.display = "none"; done(art);
+      } catch { msg.textContent = "Неверный пароль"; lock.style.display = "flex"; input.select(); }
+    };
+    form.onsubmit = e => { e.preventDefault(); tryPass(input.value); };
+    let saved = null; try { saved = sessionStorage.getItem("kir-pass"); } catch {}
+    if (saved) tryPass(saved); else { lock.style.display = "flex"; input.focus(); }
+  });
+}
+
+// грузим картины, потом рисуем
+loadArt().then(art => Promise.all(Object.keys(art).map(k => new Promise(res => {
+  const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.src = art[k];
+})))).then(() => {
+  const m = location.hash.match(/^#(vg|modi)-(\d+)$/);
+  if (m) { series = m[1]; draw(Number(m[2])); } else draw(newSeed());
+});
+</script>
+</body>
+</html>

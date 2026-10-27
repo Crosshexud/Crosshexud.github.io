@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0c0b">
+<title>КИР — создать NFT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/css/kir.css">
+<style>
+  .layout { display: grid; gap: 16px; }
+  @media (min-width: 820px) {
+    .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+    .art { position: sticky; top: 90px; }
+  }
+  .pick { display: grid; margin-top: 12px; }
+  .pick .btn svg { color: var(--accent-2); }
+  .notice { display: flex; gap: 12px; align-items: flex-start; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .notice .ico { font-size: 22px; line-height: 1; }
+  .notice p { margin: 2px 0 10px; color: var(--muted); font-size: 14px; }
+  .notice h3 { font-family: var(--sans); font-size: 15px; font-weight: 600; }
+  .stat { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .stat:first-child { border-top: 0; }
+  .success img { border-radius: 12px; aspect-ratio: 3/4; object-fit: cover; width: 100%; background: #050505; }
+  #gate { padding: 0; border: 0; background: none; }
+  #gate .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; }
+  .counter { text-align: right; font-size: 12px; color: var(--muted); margin-top: -10px; margin-bottom: 10px; }
+</style>
+</head>
+<body data-page="create">
+<main class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Мастерская</div>
+    <h1>Создать NFT</h1>
+    <p>Работа навсегда сохраняется в хранилище Arweave и становится NFT в твоей коллекции «КИР» на Solana.</p>
+  </div>
+
+  <div class="layout">
+    <section class="art">
+      <div class="frame" id="frame"><div class="empty">Выбери работу в генераторе<br>и нажми «Создать NFT →»</div></div>
+      <div class="pick">
+        <a class="btn" href="/remix/">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>
+          Выбрать работу в генераторе
+        </a>
+      </div>
+    </section>
+
+    <section>
+      <div class="card" id="gate"></div>
+
+      <div class="card">
+        <label class="field"><span>Название</span>
+          <input id="name" class="input" maxlength="32" placeholder="Например, «Сон скрипки»" autocomplete="off">
+        </label>
+        <div class="counter"><span id="nameLen">0</span>/32</div>
+        <label class="field"><span>Описание</span>
+          <textarea id="desc" class="input" maxlength="500" placeholder="О чём эта работа"></textarea>
+        </label>
+        <div class="chips" id="traits"></div>
+        <button class="btn primary block" id="mint" style="margin-top:16px" disabled>Создать NFT</button>
+        <ol class="steps" id="steps" hidden>
+          <li data-s="upload"><i></i>Загрузка картинки в хранилище</li>
+          <li data-s="meta"><i></i>Сохранение описания</li>
+          <li data-s="chain"><i></i>Запись в блокчейн Solana</li>
+        </ol>
+        <p class="small muted" id="hint" style="margin:12px 0 0">Phantom попросит подтверждение 2–4 раза — это нормально.</p>
+      </div>
+
+      <div class="card">
+        <div class="stat"><span class="muted">Сеть</span><span>Solana Devnet (тестовая)</span></div>
+        <div class="stat"><span class="muted">Стандарт</span><span>Metaplex Core</span></div>
+        <div class="stat"><span class="muted">Хранилище</span><span>Arweave через Irys</span></div>
+        <div class="stat"><span class="muted">Роялти автору</span><span>5% с перепродаж</span></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="/site/js/config.js"></script>
+<script src="/site/js/kir-mint.js"></script>
+<script src="/site/js/ui.js"></script>
+<script src="/site/js/pending.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const { toast, esc } = KIRUI;
+let work = null;       // { bytes, contentType, fileName, metadata }
+let collection = null; // коллекция «КИР», если уже есть
+let busy = false;
+
+// ---------- верхняя карточка: что нужно сделать сейчас ----------
+async function renderGate() {
+  const g = $('gate');
+  if (!KIRMint.owner) {
+    collection = null;
+    g.innerHTML = `<div class="notice" style="margin:0"><span class="ico">👛</span><div>
+      <h3>Подключи кошелёк</h3><p>NFT будет принадлежать тебе — нужен Phantom.</p>
+      <button class="btn primary" id="gConnect">Подключить Phantom</button></div></div>`;
+    $('gConnect').onclick = () => KIRUI.connect();
+    return update();
+  }
+  g.innerHTML = `<div class="muted small">Проверяю коллекцию…</div>`;
+  collection = await KIRMint.getCollection();
+  if (!collection) {
+    g.innerHTML = `<div class="notice" style="margin:0"><span class="ico">🗂️</span><div>
+      <h3>Создай коллекцию «КИР»</h3><p>Это делается один раз. Все твои NFT будут лежать в ней, а выбранная работа станет обложкой.</p>
+      <button class="btn primary" id="gColl" ${work ? '' : 'disabled'}>Создать коллекцию</button>
+      ${work ? '' : '<p class="small" style="margin:8px 0 0">Сначала выбери работу в генераторе — она станет обложкой.</p>'}</div></div>`;
+    $('gColl').onclick = makeCollection;
+  } else {
+    g.innerHTML = `<div class="stat"><span>Коллекция <b>«КИР»</b> · работ: ${collection.numMinted ?? 0}</span>
+      <a class="small" href="/site/gallery.html">Галерея →</a></div>`;
+  }
+  update();
+}
+
+function update() {
+  $('mint').disabled = busy || !KIRMint.owner || !collection || !work || !$('name').value.trim();
+  $('nameLen').textContent = $('name').value.length;
+}
+
+function stepper(active) {
+  const order = ['upload', 'meta', 'chain', 'done'];
+  $('steps').hidden = false;
+  [...$('steps').children].forEach(li => {
+    const i = order.indexOf(li.dataset.s), a = order.indexOf(active);
+    li.className = i < a ? 'done' : i === a ? 'now' : '';
+  });
+}
+
+async function makeCollection() {
+  busy = true; $('gColl').disabled = true; update();
+  try {
+    await KIRMint.createKirCollection({ imageBytes: work.bytes, contentType: work.contentType, onStep: s => stepper(s) });
+    toast('Коллекция «КИР» создана!', 'ok');
+  } catch (e) { toast('Не получилось: ' + esc(e.message || e), 'err', 9000); console.error(e); }
+  busy = false; $('steps').hidden = true;
+  KIRUI.refresh(); renderGate();
+}
+
+// ---------- картинка ----------
+function setWork(w) {
+  work = w;
+  const url = URL.createObjectURL(new Blob([w.bytes], { type: w.contentType }));
+  $('frame').innerHTML = `<img src="${url}" alt="">`;
+  $('name').value = (w.metadata?.name || '').slice(0, 32);
+  $('desc').value = w.metadata?.description || '';
+  $('traits').innerHTML = (w.metadata?.attributes || []).map(a => `<span class="chip">${esc(a.trait_type)}: <b>${esc(a.value)}</b></span>`).join('');
+  renderGate();
+}
+// своих картинок нет намеренно: NFT создаются только из работ генератора
+$('name').oninput = update;
+
+// ---------- создание NFT ----------
+$('mint').onclick = async () => {
+  const name = $('name').value.trim();
+  busy = true; update();
+  try {
+    const meta = { ...work.metadata, name, description: $('desc').value.trim() };
+    delete meta.image; delete meta.properties;
+    const r = await KIRMint.mint({ imageBytes: work.bytes, contentType: work.contentType, fileName: work.fileName, metadata: meta, onStep: s => stepper(s) });
+    KIRUI.refresh();
+    const v = await KIRUI.sheet(`
+      <img src="${URL.createObjectURL(new Blob([work.bytes], { type: work.contentType }))}" alt="" style="border-radius:12px;width:100%;aspect-ratio:3/4;object-fit:cover;background:#050505">
+      <div style="margin-top:14px">
+        <div class="eyebrow">Готово</div>
+        <h2 style="font-size:32px">«${esc(name)}»</h2>
+        <p class="muted">NFT создан и лежит в твоём кошельке Phantom (раздел «Коллекционные»).</p>
+        <div class="btns" style="flex-direction:column">
+          <a class="btn primary" href="/site/gallery.html">Смотреть в галерее</a>
+          <a class="btn" href="${r.link}" target="_blank">Запись в блокчейне</a>
+          <button class="btn ghost" data-v="more">Создать ещё</button>
+        </div>
+      </div>`, 'two');
+    if (v === 'more') location.href = '/remix/';
+  } catch (e) { toast('Не получилось: ' + esc(e.message || e), 'err', 9000); console.error(e); }
+  busy = false; $('steps').hidden = true;
+  renderGate();
+};
+
+KIRUI.ready.then(() => { renderGate(); KIRMint.onChange(renderGate); });
+KIRPending.take().then(w => { if (w) setWork(w); });
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# ОРИГИНАЛЫ КАРТИН — никогда не выкладывать (на GitHub только зашифрованный remix/art.enc.json)
+remix/art.js
+site/art/
+*.jpg
+*.jpeg
+
+# служебное
+mint/node_modules/
+dist/
+.wrangler/
