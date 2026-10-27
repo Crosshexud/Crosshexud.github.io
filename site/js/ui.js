@@ -29,7 +29,7 @@ window.KIRUI = (() => {
     <a class="logo" href="/">К<span>И</span>Р</a>
     <nav>${PAGES.map(p => `<a href="${p.href}" class="${p.id === page ? 'on' : ''}">${p.label}</a>`).join('')}</nav>
     <span class="spacer"></span>
-    <span class="net" title="Тестовая сеть: монеты ненастоящие">Devnet</span>
+    ${(window.KIR_CONFIG?.cluster || "devnet") === "devnet" ? '<span class="net" title="Тестовая сеть: монеты ненастоящие">Devnet</span>' : ''}
     <button class="wallet" id="kir-wallet"><span class="dot"></span><span class="lbl">Кошелёк</span></button>`;
   document.body.prepend(top);
 

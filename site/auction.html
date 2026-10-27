@@ -63,6 +63,9 @@
   .quick button { font: 600 13px var(--sans); color: var(--fg); background: rgba(255,255,255,.04); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   .quick button:hover { border-color: var(--accent); }
   .lead { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(111,207,143,.08); border: 1px solid rgba(111,207,143,.3); font-size: 14px; margin-bottom: 12px; }
+  .mine { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .mine .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; background: var(--card, rgba(255,255,255,.04)); border: 1px solid rgba(232,64,47,.35); }
+  .mine .row b { font-size: 16px; }
 
   /* программа ещё не выложена */
   .soon { position: relative; border-radius: 22px; overflow: hidden; min-height: 440px; display: grid; place-items: center; padding: 24px 16px; }
@@ -88,6 +91,7 @@
     <div class="seg"><button id="f-live" class="on">Идут торги</button><button id="f-done">Завершены</button></div>
     <button class="btn sm" id="reload">Обновить</button>
   </div>
+  <div class="mine" id="mine" hidden></div>
   <div id="list"></div>
 </main>
 
@@ -119,9 +123,9 @@ function notReady() {
     <p class="muted">Программа торгов готова и проверена — осталось выложить её в сеть Solana.</p>
     <div class="how3">
       <div><b>1</b>Владелец NFT выставляет работу: стартовая цена, шаг и срок торгов.</div>
-      <div><b>2</b>Участники делают ставки в SOL. Перебитому участнику деньги возвращаются сразу.</div>
+      <div><b>2</b>Участники делают ставки в SOL. Перебитый участник забирает свои деньги в любой момент.</div>
       <div><b>3</b>Ставка в последние 5 минут продлевает торги — «выхватить» лот в последнюю секунду не выйдет.</div>
-      <div><b>4</b>После конца торгов NFT уходит победителю, SOL — продавцу.</div>
+      <div><b>4</b>После конца торгов NFT уходит победителю, SOL — продавцу и автору (роялти).</div>
     </div>
     <a class="btn primary" href="/site/gallery.html">Смотреть галерею</a></div></div>`;
   fetch('/remix/works/index.json').then(r => r.json()).then(all => {
@@ -143,6 +147,7 @@ async function load() {
     return;
   }
   render();
+  renderMine();
   if (wanted) { const w = wanted; wanted = null; const l = lots.find(x => x.address.toBase58() === w); if (l) { if (left(l) <= 0) $("f-done").click(); showLot(w); } }
 }
 
@@ -163,11 +168,29 @@ function render() {
         <span class="badge ${s > 0 ? 'live' : ''}">${s > 0 ? 'идут торги' : 'ждёт завершения'}</span>
         ${me ? `<span class="badge me">${me}</span>` : ''}</div>
       <div class="info"><div class="nm">${esc(n?.name || 'Работа КИР')}</div>
-        <div class="row2"><div><small>${l.bidCount ? 'ставка' : 'старт'}</small><b>${sol(l.bidCount ? l.highestBid : l.minBid)} SOL</b></div>
+        <div class="row2"><div><small>${l.highestBidder ? 'ставка' : 'старт'}</small><b>${sol(l.highestBidder ? l.highestBid : l.minBid)} SOL</b></div>
         <div class="t ${s > 0 && s < 3600 ? "hot" : ""}"><small>${l.bidCount} ${plural(l.bidCount)}</small><b data-end="${l.endTs}">${hms(s)}</b></div></div></div>
     </button>`;
   }).join('')}</div>`;
 }
+// ---------- мои ставки, которые можно забрать (перебили или лот закрыт) ----------
+async function renderMine() {
+  const box = $('mine');
+  const list = (await AU.myBids().catch(() => [])).filter(x => x.canWithdraw);
+  box.hidden = !list.length;
+  box.innerHTML = list.map(({ bid, lot }) => {
+    const why = !lot ? 'лот закрыт' : lot.startTs !== bid.auctionStart ? 'прошлые торги этого NFT' : 'тебя перебили';
+    const n = lot && art.get(lot.asset.toBase58());
+    return `<div class="row"><div><b>${sol(bid.amount)} SOL</b> <span class="muted small">— твоя ставка${n?.name ? ` на «${esc(n.name)}»` : ''}, ${why}</span></div>
+      <button class="btn primary sm" data-w="${bid.auction.toBase58()}">Забрать</button></div>`;
+  }).join('');
+  box.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Подтверди в Phantom…';
+    try { await AU.withdraw(b.dataset.w); toast('SOL вернулись на кошелёк', 'ok'); load(); }
+    catch (e) { toast(esc(e.message || e), 'err', 8000); b.disabled = false; b.textContent = 'Забрать'; }
+  });
+}
+
 const plural = n => (n % 10 === 1 && n % 100 !== 11 ? 'ставка' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'ставки' : 'ставок');
 
 // таймеры тикают каждую секунду
@@ -188,7 +211,7 @@ async function showLot(address) {
   const min = AU.toSol(AU.nextMin(l)), step = AU.toSol(l.minIncrement);
   const action = !KIRMint.owner ? `<button class="btn primary block" data-v="connect">Подключить Phantom, чтобы участвовать</button>`
     : ended ? `<button class="btn primary block" id="settle">Завершить торги</button>
-        <p class="small muted" style="margin:10px 0 0">${l.bidCount ? 'NFT уйдёт победителю, SOL — продавцу.' : 'Ставок не было — NFT вернётся продавцу.'} Завершить может любой.</p>`
+        <p class="small muted" style="margin:10px 0 0">${l.highestBidder ? 'NFT уйдёт победителю, SOL — продавцу' + (l.royaltyBps ? ' и автору' : '') + '.' : 'Победителя нет — NFT вернётся продавцу.'} Завершить может любой.</p>`
     : isSeller ? (l.bidCount ? `<p class="muted small">Это твой лот. Снять его уже нельзя — на него есть ставки.</p>`
         : `<p class="muted small">Это твой лот. Пока ставок нет, его можно снять с торгов.</p><button class="btn block" id="cancel">Снять с торгов</button>`)
     : `${leading ? '<div class="lead">🏆 Твоя ставка лидирует. Можно поднять её ещё выше.</div>' : ''}
@@ -196,21 +219,22 @@ async function showLot(address) {
        <span class="muted">SOL</span></div>
        <div class="quick"><button data-q="0">мин. ${min}</button><button data-q="1">+${step}</button><button data-q="5">+${+(step * 5).toFixed(4)}</button></div>
        <button class="btn primary block" id="bid">Сделать ставку</button>
-       <p class="small muted" style="margin:10px 0 0">Если тебя перебьют, SOL сразу вернутся на кошелёк.</p>`;
+       <p class="small muted" style="margin:10px 0 0" id="mybid">Деньги лежат на твоём личном счёте ставки. Если тебя перебьют — заберёшь их кнопкой «Забрать».</p>`;
 
   const p = KIRUI.sheet(`
     <div class="detail"><div class="frame">${n.image ? `<img src="${esc(n.image)}" alt="">` : '<div class="empty">NFT</div>'}</div></div>
     <div>
       <div class="eyebrow">${ended ? 'Торги закончились' : 'Идут торги'}</div>
       <h2 style="font-size:32px;font-style:italic">${esc(n.name || 'Работа КИР')}</h2>
-      <div style="margin-top:14px"><small class="muted small">${l.bidCount ? 'Текущая ставка' : 'Стартовая цена'}</small>
-        <div class="big">${sol(l.bidCount ? l.highestBid : l.minBid)} SOL</div></div>
+      <div style="margin-top:14px"><small class="muted small">${l.highestBidder ? 'Текущая ставка' : 'Стартовая цена'}</small>
+        <div class="big">${sol(l.highestBidder ? l.highestBid : l.minBid)} SOL</div></div>
       <div class="clock" id="clk"></div>
       <div id="act">${action}</div>
       <dl class="kv">
         <dt>Ставок</dt><dd>${l.bidCount}</dd>
-        ${l.bidCount ? `<dt>Лидер</dt><dd class="mono">${leading ? 'ты' : short(l.highestBidder.toBase58())}</dd>` : ''}
+        ${l.highestBidder ? `<dt>Лидер</dt><dd class="mono">${leading ? 'ты' : short(l.highestBidder.toBase58())}</dd>` : ''}
         <dt>Шаг ставки</dt><dd>${sol(l.minIncrement)} SOL</dd>
+        ${l.royaltyBps ? `<dt>Роялти автору</dt><dd>${l.royaltyBps / 100}% от цены</dd>` : ''}
         <dt>Продавец</dt><dd class="mono">${isSeller ? 'ты' : short(l.seller.toBase58())}</dd>
         <dt>Конец торгов</dt><dd>${new Date(l.endTs * 1000).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</dd>
       </dl>
@@ -227,6 +251,13 @@ async function showLot(address) {
       .map(([v, t]) => `<div><b>${String(v).padStart(2, '0')}</b><span>${t}</span></div>`).join('');
   } };
   open.tick();
+
+  // уже есть моя ставка на этих торгах — подскажем, что доплатится только разница
+  AU.myBid(address).then(b => {
+    const el = document.getElementById('mybid');
+    if (el && b && b.auctionStart === l.startTs && b.amount > 0n)
+      el.textContent = `Ты уже поставил ${sol(b.amount)} SOL — при новой ставке доплатишь только разницу.`;
+  }).catch(() => {});
 
   const amt = document.getElementById('amt');
   document.querySelectorAll('.quick [data-q]').forEach(b => b.onclick = () => {
@@ -260,7 +291,7 @@ $('reload').onclick = load;
 
 KIRUI.ready.then(() => {
   load();
-  KIRMint.onChange(() => lots.length && render());
+  KIRMint.onChange(() => { if (lots.length) render(); renderMine(); });
   timer = setInterval(() => { if (!document.hidden && !open) load(); }, 20000);
 });
 // открыть конкретный лот по ссылке /site/auction.html#<адрес лота> (один раз, когда лоты загрузятся)

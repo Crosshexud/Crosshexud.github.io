@@ -71,7 +71,7 @@
       </div>
 
       <div class="card">
-        <div class="stat"><span class="muted">Сеть</span><span>Solana Devnet (тестовая)</span></div>
+        <div class="stat"><span class="muted">Сеть</span><span id="netname">Solana Devnet (тестовая)</span></div>
         <div class="stat"><span class="muted">Стандарт</span><span>Metaplex Core</span></div>
         <div class="stat"><span class="muted">Хранилище</span><span>Arweave через Irys</span></div>
         <div class="stat"><span class="muted">Роялти автору</span><span>5% с перепродаж</span></div>
@@ -181,6 +181,7 @@ $('mint').onclick = async () => {
   renderGate();
 };
 
+if (KIRMint.cluster !== 'devnet') document.getElementById('netname').textContent = 'Solana (основная сеть)';
 KIRUI.ready.then(() => { renderGate(); KIRMint.onChange(renderGate); });
 KIRPending.take().then(w => { if (w) setWork(w); });
 </script>

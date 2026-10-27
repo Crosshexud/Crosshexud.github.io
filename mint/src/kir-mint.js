@@ -10,8 +10,9 @@ import { generateSigner, createGenericFile, publicKey } from '@metaplex-foundati
 import * as web3 from '@solana/web3.js';
 import { makeAuction, explainError, LAMPORTS } from '../../auction/client/kir-auction.js';
 
-const RPC = 'https://api.devnet.solana.com';
-const CLUSTER = 'devnet';
+// сеть берётся из site/js/config.js: 'devnet' (тестовая) или 'mainnet-beta' (настоящие деньги)
+const CLUSTER = window.KIR_CONFIG?.cluster || 'devnet';
+const RPC = window.KIR_CONFIG?.rpc || (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com');
 const STORE_KEY = 'kir-collection-' + CLUSTER;
 const COLLECTION_NAME = 'КИР';
 const ROYALTY = 500; // 5% автору с каждой перепродажи
@@ -22,7 +23,7 @@ let owner = null;
 const listeners = new Set();
 const emit = () => listeners.forEach(f => f(owner));
 
-const explorer = (addr, kind = 'address') => `https://explorer.solana.com/${kind}/${addr}?cluster=${CLUSTER}`;
+const explorer = (addr, kind = 'address') => `https://explorer.solana.com/${kind}/${addr}${CLUSTER === 'devnet' ? '?cluster=devnet' : ''}`;
 // библиотека отдаёт ссылки на основной шлюз, а файлы тестовой сети лежат на devnet-узле
 const fixUri = uri => CLUSTER === 'devnet' ? uri.replace('https://gateway.irys.xyz/', 'https://devnet.irys.xyz/') : uri;
 const phantom = () => window.phantom?.solana?.isPhantom ? window.phantom.solana : null;
@@ -166,11 +167,11 @@ const A = makeAuction(web3, window.KIR_CONFIG?.auctionProgram || 'HmsxX4gHaGzr8e
 const toLamports = sol => BigInt(Math.round(Number(sol) * LAMPORTS));
 const toSol = lamports => Number(lamports) / LAMPORTS;
 
-// подписать в Phantom и отправить одну команду
-async function sendIx(ix) {
+// подписать в Phantom и отправить команды одной транзакцией
+async function sendIx(...ixs) {
   const p = phantom();
   if (!owner || !p) throw new Error('Подключи кошелёк Phantom');
-  const tx = new web3.Transaction().add(ix);
+  const tx = new web3.Transaction().add(...ixs);
   tx.feePayer = new web3.PublicKey(owner);
   const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
   tx.recentBlockhash = blockhash;
@@ -208,13 +209,36 @@ const auction = {
     seller: me(), asset: new web3.PublicKey(asset), collection: collection ? new web3.PublicKey(collection) : null,
     minBid: toLamports(minBid), minIncrement: toLamports(step), duration,
   })),
-  // ставка: сначала перечитываем лот — вдруг кто-то уже перебил
+  // ставка: сначала перечитываем лот — вдруг кто-то уже перебил.
+  // Если на этом адресе лежит ставка с прошлых торгов того же NFT — забираем её в той же транзакции.
   async bid(address, sol) {
     const lot = await lotOf(address);
-    return sendIx(A.bid({ bidder: me(), auction: lot, amount: toLamports(sol) }));
+    const old = await auction.myBid(address);
+    const ixs = old && old.auctionStart !== lot.startTs ? [A.withdraw({ bidder: me(), auction: lot })] : [];
+    return sendIx(...ixs, A.bid({ bidder: me(), auction: lot, amount: toLamports(sol) }));
   },
   settle: async address => sendIx(A.settle({ payer: me(), auction: await lotOf(address) })),
   cancel: async address => sendIx(A.cancel({ seller: me(), auction: await lotOf(address) })),
+  // забрать свою ставку (перебили или лот закрыт)
+  withdraw: address => sendIx(A.withdraw({ bidder: me(), auction: address })),
+  // моя ставка на этом лоте (или null)
+  async myBid(address) {
+    if (!owner) return null;
+    const pda = A.bidPda(new web3.PublicKey(address), me());
+    const acc = await conn.getAccountInfo(pda);
+    return acc && acc.owner.equals(A.PID) ? A.decodeBid(pda, acc.data) : null;
+  },
+  // все мои ставки: { bid, lot (null — лот закрыт), leading, canWithdraw }
+  async myBids() {
+    if (!owner) return [];
+    const bids = await A.fetchBids(conn, me());
+    return Promise.all(bids.map(async bid => {
+      const lot = await A.fetchOne(conn, bid.auction);
+      const same = lot && lot.startTs === bid.auctionStart;
+      const leading = !!(same && lot.highestBidder?.equals(me()));
+      return { bid, lot, leading, canWithdraw: !leading };
+    }));
+  },
 };
 
 window.KIRMint = {

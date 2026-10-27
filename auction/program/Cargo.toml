@@ -5,7 +5,7 @@ edition = "2021"
 description = "Аукцион NFT «КИР» (Metaplex Core) на Solana"
 
 [lib]
-crate-type = ["cdylib", "lib"]
+crate-type = ["cdylib"]
 
 [features]
 # короткие торги для автотестов (не для выкладки!)
@@ -22,6 +22,7 @@ solana-address = { version = "2", features = ["curve25519", "syscalls"] }
 [profile.release]
 overflow-checks = true
 lto = "fat"
+opt-level = "s"
 codegen-units = 1
 
 [lints.rust]
