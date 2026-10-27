@@ -69,6 +69,7 @@
         <div class="muted small" style="margin-bottom:10px">Недавние работы</div>
         <div class="hist" id="hist"></div>
       </div>
+      <button class="btn sm" id="author" style="opacity:.6">🔒 Режим автора</button>
     </section>
   </div>
 </main>
@@ -83,11 +84,14 @@
 <script src="art.js"></script><!-- только дома: на GitHub этого файла нет, там зашифрованный art.enc.json -->
 <div id="lock" style="display:none;position:fixed;inset:0;z-index:50;background:var(--bg);align-items:center;justify-content:center;padding:16px">
   <form class="card" id="lockForm" style="max-width:360px;width:100%">
-    <div class="eyebrow">Закрытая мастерская</div>
-    <p class="muted small">Картины автора зашифрованы. Введи пароль, чтобы открыть генератор.</p>
+    <div class="eyebrow">Режим автора</div>
+    <p class="muted small">Оригиналы картин зашифрованы. Введи пароль, чтобы открыть их в генераторе.</p>
     <input id="lockPass" class="input" type="password" placeholder="Пароль" autocomplete="current-password">
     <p class="small" id="lockMsg" style="color:var(--accent-2);min-height:1.2em"></p>
-    <button class="btn primary" style="width:100%">Открыть</button>
+    <div class="file-btns">
+      <button class="btn" type="button" id="lockCancel">Отмена</button>
+      <button class="btn primary">Открыть</button>
+    </div>
   </form>
 </div>
 <script src="/site/js/pending.js"></script>
@@ -277,7 +281,9 @@ const WORDS_B = ["скрипки", "башни", "младенца", "знаме
 
 // ---------- главная функция ----------
 let series = "vg", current = null;
+let SET = null; // готовые работы (remix/works) — на сайте без оригиналов генератор показывает их
 function draw(seed) {
+  if (SET) return showWork(seed);
   R = mulberry32(seed);
   for (let i = 0; i < 8; i++) R(); // разгон: у близких зёрен первые числа почти одинаковые
   const s = SERIES[series];
@@ -287,13 +293,28 @@ function draw(seed) {
   ctx.restore();
   finish(s);
 
-  const title = `${pick(WORDS_A)} ${pick(WORDS_B)}`;
-  current = { seed, series, title, tech };
-  document.getElementById("title").textContent = `«${title}»`;
+  describe({ seed, series, title: `${pick(WORDS_A)} ${pick(WORDS_B)}`, tech });
+}
+
+// готовая работа из набора: картинка уже нарисована заранее (mint/bake.js)
+function showWork(seed) {
+  const w = SET.find(w => w.s === series && w.seed === seed) || SET.find(w => w.s === series);
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => { ctx.drawImage(im, 0, 0, W, H); describe({ seed: w.seed, series: w.s, title: w.title, tech: w.tech }); res(); };
+    im.onerror = res;
+    im.src = `works/${w.s}-${w.seed}.webp`;
+  });
+}
+
+function describe(work) {
+  current = work;
+  const s = SERIES[work.series];
+  document.getElementById("title").textContent = `«${work.title}»`;
   const chip = (k, v) => `<span class="chip">${k}: <b>${v}</b></span>`;
-  document.getElementById("traits").innerHTML = chip("серия", s.name) + chip("техника", tech) +
-    chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) + chip("зерно", seed);
-  history.replaceState(null, "", `#${series}-${seed}`);
+  document.getElementById("traits").innerHTML = chip("серия", s.name) + chip("техника", work.tech) +
+    chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) + chip("зерно", work.seed);
+  history.replaceState(null, "", `#${series}-${work.seed}`);
   document.getElementById("s-vg").classList.toggle("on", series === "vg");
   document.getElementById("s-modi").classList.toggle("on", series === "modi");
   remember();
@@ -321,10 +342,14 @@ document.getElementById("hist").onclick = e => {
 function redraw(seed) {
   const f = document.getElementById("frame");
   f.classList.add("busy");
-  setTimeout(() => { draw(seed); f.classList.remove("busy"); }, 30);
+  setTimeout(() => Promise.resolve(draw(seed)).then(() => f.classList.remove("busy")), 30);
 }
 
-function newSeed() { return Math.floor(Math.random() * 1e9); }
+function newSeed() {
+  if (!SET) return Math.floor(Math.random() * 1e9);
+  const own = SET.filter(w => w.s === series && !(current && w.seed === current.seed));
+  return own[Math.floor(Math.random() * own.length)].seed;
+}
 function download(name, url) {
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
 }
@@ -377,7 +402,8 @@ document.getElementById("nft").onclick = () => {
   }, "image/png");
 };
 
-// картины: дома — из art.js, на сайте — расшифровка art.enc.json паролем (?lock — проверить пароль дома)
+// картины: дома — из art.js; на сайте — готовые работы, а режим автора расшифровывает art.enc.json паролем
+// (?lock — посмотреть дома, как будет на сайте)
 async function unlock(pass) {
   const enc = await (await fetch("art.enc.json")).json();
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -387,32 +413,41 @@ async function unlock(pass) {
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.data)); // неверный пароль → ошибка
   return JSON.parse(new TextDecoder().decode(plain));
 }
-function loadArt() {
-  if (typeof ART !== "undefined" && !/[?&]lock\b/.test(location.search)) return Promise.resolve(ART);
-  return new Promise(done => {
-    const lock = document.getElementById("lock"), form = document.getElementById("lockForm");
-    const input = document.getElementById("lockPass"), msg = document.getElementById("lockMsg");
-    const tryPass = async pass => {
-      msg.textContent = "Открываю…";
-      try {
-        const art = await unlock(pass);
-        try { sessionStorage.setItem("kir-pass", pass); } catch {}
-        lock.style.display = "none"; done(art);
-      } catch { msg.textContent = "Неверный пароль"; lock.style.display = "flex"; input.select(); }
-    };
-    form.onsubmit = e => { e.preventDefault(); tryPass(input.value); };
-    let saved = null; try { saved = sessionStorage.getItem("kir-pass"); } catch {}
-    if (saved) tryPass(saved); else { lock.style.display = "flex"; input.focus(); }
-  });
+function useArt(art) {
+  return Promise.all(Object.keys(art).map(k => new Promise(res => {
+    const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.src = art[k];
+  }))).then(() => { SET = null; document.getElementById("author").style.display = "none"; });
 }
 
-// грузим картины, потом рисуем
-loadArt().then(art => Promise.all(Object.keys(art).map(k => new Promise(res => {
-  const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.src = art[k];
-})))).then(() => {
+// режим автора: пароль → оригиналы → бесконечный генератор
+const lock = document.getElementById("lock"), input = document.getElementById("lockPass"), msg = document.getElementById("lockMsg");
+async function tryPass(pass, quiet) {
+  msg.textContent = "Открываю…";
+  try {
+    await useArt(await unlock(pass));
+    try { sessionStorage.setItem("kir-pass", pass); } catch {}
+    lock.style.display = "none";
+    return true;
+  } catch {
+    msg.textContent = quiet ? "" : "Неверный пароль"; input.select();
+    return false;
+  }
+}
+document.getElementById("author").onclick = () => { msg.textContent = ""; lock.style.display = "flex"; input.focus(); };
+document.getElementById("lockCancel").onclick = () => { lock.style.display = "none"; };
+document.getElementById("lockForm").onsubmit = async e => {
+  e.preventDefault();
+  if (await tryPass(input.value)) redraw(newSeed());
+};
+
+// грузим картины (или набор готовых работ), потом рисуем
+(async () => {
+  let saved = null; try { saved = sessionStorage.getItem("kir-pass"); } catch {}
+  if (typeof ART !== "undefined" && !/[?&]lock\b/.test(location.search)) await useArt(ART);
+  else if (!(saved && await tryPass(saved, true))) SET = await (await fetch("works/index.json")).json();
   const m = location.hash.match(/^#(vg|modi)-(\d+)$/);
   if (m) { series = m[1]; draw(Number(m[2])); } else draw(newSeed());
-});
+})();
 </script>
 </body>
 </html>
