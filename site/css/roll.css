@@ -1,0 +1,150 @@
+/* Ролл редкости в генераторе (site/js/roll.js): перебор в рамке картины и сцены на весь экран для очень редких */
+
+/* ---------- перебор в рамке ---------- */
+.roll { position: absolute; inset: clamp(6px, 1.4vw, 12px); z-index: 3; display: grid; place-items: center; overflow: hidden; text-align: center;
+        container-type: inline-size; /* размер надписи — от ширины картины, чтобы «Божественный» влезал в одну строку */
+        background: radial-gradient(circle at 50% 45%, #1d1814, #0a0807 72%); transition: opacity .3s; cursor: pointer; }
+.roll::before { /* бегущие полосы — как крутящийся барабан */
+  content: ""; position: absolute; inset: -40px 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 2px, transparent 2px 22px); animation: roll-reel .45s linear infinite; }
+.roll.land::before { animation: none; opacity: .4; }
+.roll::after { /* свет за надписью, разгорается у очень редких */
+  content: ""; position: absolute; width: 70%; aspect-ratio: 1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, var(--tg, transparent), transparent 65%); opacity: .55; transition: opacity .3s, transform .65s ease-in; }
+.roll.charge::after { opacity: 1; transform: scale(2.4); }
+@keyframes roll-reel { to { transform: translateY(22px); } }
+
+.roll-in { position: relative; z-index: 1; display: grid; gap: 8px; padding: 0 10px; }
+.roll-in.pop { animation: roll-pop .2s var(--ease); }
+@keyframes roll-pop { from { transform: scale(1.22); opacity: .5; } }
+.roll small { font: 600 11px var(--sans); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.roll b { font: 700 24px/1.05 var(--display); font-size: clamp(16px, 8.4cqi, 40px); white-space: nowrap; text-transform: uppercase;
+          color: var(--tc, var(--fg)); text-shadow: 0 0 24px var(--tg, transparent); }
+.roll span { font: 600 14px var(--sans); color: rgba(243,237,228,.7); }
+.roll.land b { animation: roll-land .5s var(--ease); }
+@keyframes roll-land { 0% { transform: scale(1.5); } 60% { transform: scale(.94); } }
+.roll.charge b { animation: roll-charge .65s ease-in forwards; }
+@keyframes roll-charge { to { transform: scale(1.25); filter: brightness(1.6); } }
+.roll.out { opacity: 0; }
+
+.roll[data-t=common] { --tc: #d9d2c6; }
+.roll[data-t=rare]   { --tc: #7cc0ff; --tg: rgba(111,183,255,.55); }
+.roll[data-t=legend] { --tc: #ffd36b; --tg: rgba(255,196,80,.7); }
+.roll[data-t=mythic] { --tg: rgba(200,120,255,.65); }
+.roll[data-t=mythic] b { color: #ff9be6; animation: roll-hue 1.4s linear infinite; }
+.roll[data-t=mythic].land b { animation: roll-land .5s var(--ease), roll-hue 1.4s linear infinite; }
+.roll[data-t=mythic].charge b { animation: roll-charge .65s ease-in forwards, roll-hue 1.4s linear infinite; }
+.roll[data-t=divine] { --tc: #fffdf7; --tg: rgba(255,240,200,.9); }
+.roll[data-t=divine] b { text-shadow: 0 0 14px #fff, 0 0 40px rgba(255,215,130,.95); }
+@keyframes roll-hue { to { filter: hue-rotate(360deg); } }
+
+/* вспышка рамки у «Редкого» */
+.roll-pulse { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+              animation: roll-pulse .9s var(--ease) forwards; }
+@keyframes roll-pulse { from { box-shadow: 0 0 0 0 rgba(124,192,255,.95), inset 0 0 40px rgba(124,192,255,.7); }
+                        to { box-shadow: 0 0 0 26px rgba(124,192,255,0), inset 0 0 40px rgba(124,192,255,0); } }
+
+/* ---------- сцена на весь экран ---------- */
+.cine { position: fixed; inset: 0; z-index: 200; overflow: hidden; display: grid; place-items: center; cursor: pointer; user-select: none;
+        background: radial-gradient(circle at 50% 45%, rgba(24,19,14,.94), rgba(0,0,0,.985)); opacity: 0; transition: opacity .35s;
+        -webkit-tap-highlight-color: transparent; }
+.cine.on { opacity: 1; }
+.cine.out { opacity: 0; transition: opacity .45s; }
+.cine .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+
+.cine .rays { position: absolute; left: 50%; top: 45%; width: 230vmax; height: 230vmax; margin: -115vmax 0 0 -115vmax; pointer-events: none;
+              background: repeating-conic-gradient(var(--ray) 0 5deg, transparent 5deg 15deg);
+              -webkit-mask-image: radial-gradient(circle, #000, transparent 50%); mask-image: radial-gradient(circle, #000, transparent 50%);
+              opacity: 0; scale: .3; transition: opacity .7s, scale 1.1s var(--ease); }
+.cine.boom .rays { opacity: .6; scale: 1; animation: cine-spin 16s linear infinite; }
+@keyframes cine-spin { to { rotate: 360deg; } }
+
+.cine .ring { position: absolute; left: 50%; top: 45%; width: 40vmin; height: 40vmin; margin: -20vmin 0 0 -20vmin; border-radius: 50%;
+              border: 6px solid var(--ring); opacity: 0; pointer-events: none; }
+.cine.boom .ring { animation: cine-ring 1.1s var(--ease) forwards; }
+.cine.boom .ring.r2 { animation-delay: .18s; }
+@keyframes cine-ring { from { transform: scale(.15); opacity: 1; } to { transform: scale(3.4); opacity: 0; border-width: 1px; } }
+
+.cine .flash { position: absolute; inset: 0; background: var(--flash); opacity: 0; pointer-events: none; z-index: 5; }
+.cine.boom .flash { animation: cine-flash .75s ease-out; }
+@keyframes cine-flash { from { opacity: .95; } to { opacity: 0; } }
+
+.cine .beam { display: none; }
+
+.cine .stage { position: relative; z-index: 3; display: grid; justify-items: center; gap: 20px; padding: 16px; }
+.cine.boom .stage { animation: cine-shake .55s linear; }
+@keyframes cine-shake { 10%, 90% { translate: -2px 1px; } 20%, 80% { translate: 5px -2px; } 30%, 50%, 70% { translate: -7px 3px; } 40%, 60% { translate: 7px -3px; } }
+
+.cine .card { width: min(62vw, 38vh, 330px); aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; opacity: 0; transform: scale(.3) rotate(-8deg);
+              box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 0 60px 10px var(--glow), 0 30px 60px -20px #000; }
+.cine .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cine.boom .card { animation: cine-card .9s cubic-bezier(.2, 1.4, .4, 1) forwards, cine-float 4s ease-in-out .9s infinite; }
+@keyframes cine-card { 0% { opacity: 0; transform: scale(.3) rotate(-8deg); } 60% { opacity: 1; transform: scale(1.07) rotate(1.5deg); } 100% { opacity: 1; transform: none; } }
+@keyframes cine-float { 0%, 100% { transform: none; } 50% { transform: translateY(-8px); } }
+
+.cine .ttl { display: grid; gap: 6px; text-align: center; }
+.cine .ttl b { font: 700 clamp(28px, 8.5vw, 64px)/1 var(--display); letter-spacing: .03em; white-space: nowrap; }
+.cine .ttl b i { display: inline-block; font-style: normal; opacity: 0; transform: translateY(28px) scale(.5);
+                 color: var(--tc); text-shadow: 0 0 26px var(--glow); }
+.cine.boom .ttl b i { animation: cine-letter .5s cubic-bezier(.2, 1.5, .4, 1) forwards; animation-delay: calc(.25s + var(--i) * .05s); }
+@keyframes cine-letter { to { opacity: 1; transform: none; } }
+.cine .ttl span { font: 600 15px var(--sans); letter-spacing: .04em; color: rgba(255,255,255,.75); opacity: 0; }
+.cine .ttl em { font: italic 600 clamp(18px, 4.5vw, 22px) var(--serif); color: #fff; opacity: 0; }
+.cine.boom .ttl span, .cine.boom .ttl em { animation: cine-up .6s ease forwards 1s; }
+@keyframes cine-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.cine .tap { position: absolute; z-index: 4; bottom: calc(26px + env(safe-area-inset-bottom)); font: 600 13px var(--sans); letter-spacing: .08em;
+             color: rgba(255,255,255,.6); opacity: 0; transition: opacity .5s; }
+.cine.idle .tap { opacity: 1; animation: cine-blink 1.8s ease-in-out infinite; }
+@keyframes cine-blink { 50% { opacity: .35; } }
+
+/* легендарный — золото */
+.c-legend { --ray: rgba(255,205,100,.5); --ring: #ffd36b; --flash: #fff3c8; --glow: rgba(255,190,80,.75); --tc: #ffd36b; }
+
+/* мифический — радуга */
+.c-mythic { --ray: rgba(255,255,255,.35); --ring: #e9a0ff; --flash: #ffffff; --glow: rgba(190,120,255,.8); }
+.c-mythic .rays { background: repeating-conic-gradient(rgba(255,94,196,.55) 0 5deg, transparent 5deg 15deg, rgba(107,214,255,.55) 15deg 20deg,
+                  transparent 20deg 30deg, rgba(255,211,107,.55) 30deg 35deg, transparent 35deg 45deg); }
+.c-mythic.boom .rays { animation: cine-spin 11s linear infinite, roll-hue 4s linear infinite; }
+.c-mythic .ttl b { animation: roll-hue 2.2s linear infinite; }
+.c-mythic .ttl b i { color: hsl(calc(var(--i) * 32), 100%, 72%); }
+.c-mythic.boom .card { animation: cine-card .9s cubic-bezier(.2, 1.4, .4, 1) forwards, cine-float 4s ease-in-out .9s infinite, cine-glow 2.4s linear infinite; }
+@keyframes cine-glow { 0% { box-shadow: 0 0 0 2px #ff5ec4, 0 0 70px 14px rgba(255,94,196,.7); } 33% { box-shadow: 0 0 0 2px #6bd6ff, 0 0 70px 14px rgba(107,214,255,.7); }
+                       66% { box-shadow: 0 0 0 2px #ffd36b, 0 0 70px 14px rgba(255,211,107,.7); } 100% { box-shadow: 0 0 0 2px #ff5ec4, 0 0 70px 14px rgba(255,94,196,.7); } }
+
+/* божественный — луч сверху, белый свет и золото, всё медленнее и торжественнее */
+.c-divine { --ray: rgba(255,250,235,.55); --ring: #fffaf0; --flash: #ffffff; --glow: rgba(255,240,200,.95); --tc: #fffdf7;
+            background: radial-gradient(circle at 50% 40%, rgba(46,36,22,.94), rgba(0,0,0,.99)); }
+/* столб света: мягкие края, яркая середина; опускается сверху до картины и растворяется во вспышке */
+.c-divine .beam { display: block; position: absolute; left: 50%; top: 0; width: 34vmin; height: 0; margin-left: -17vmin; z-index: 1; pointer-events: none;
+                  background: linear-gradient(90deg, transparent, rgba(255,246,220,.35) 30%, #fffdf5 50%, rgba(255,246,220,.35) 70%, transparent);
+                  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent); mask-image: linear-gradient(180deg, #000 55%, transparent);
+                  filter: blur(3px); transform-origin: 50% 0; }
+.c-divine.on .beam { animation: cine-beam 1.25s cubic-bezier(.5, 0, .9, .6) forwards; }
+.c-divine.boom .beam { animation: cine-beam-out .9s ease-out forwards; }
+@keyframes cine-beam { to { height: 58vh; } } /* низ луча всегда мягкий: маска растягивается вместе с ним */
+@keyframes cine-beam-out { from { height: 58vh; opacity: 1; scale: 1 1; } to { height: 58vh; opacity: 0; scale: 4 1.6; } }
+.c-divine.boom .rays { opacity: .75; animation-duration: 26s; }
+.c-divine .card { box-shadow: 0 0 0 2px rgba(255,250,235,.9), 0 0 100px 24px rgba(255,240,200,.85), 0 30px 60px -20px #000; }
+.c-divine .ttl b i { text-shadow: 0 0 16px #fff, 0 0 44px rgba(255,215,130,.95); }
+.c-divine.boom .ttl b i { animation-duration: .8s; animation-delay: calc(.45s + var(--i) * .09s); }
+.c-divine.boom .ttl span, .c-divine.boom .ttl em { animation-delay: 1.9s; }
+
+/* таблица шансов (окно «Шансы» в генераторе) */
+.odds-list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.odds-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid var(--line); }
+.odds-row:first-child { border-top: 0; }
+.odds-row b { font: 700 15px var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.odds-row span { margin-left: auto; font: 600 14px var(--sans); color: var(--muted); white-space: nowrap; }
+.odds-row .chip { cursor: pointer; font: inherit; font-size: 12px; padding: 4px 10px; color: var(--fg); white-space: nowrap; }
+@media (max-width: 420px) { .odds-row { padding: 10px 12px; gap: 8px; } .odds-row b { font-size: 13px; } .odds-row .chip { padding: 4px 8px; } }
+@media (max-width: 360px) { .odds-row .chip .t { display: none; } } /* на самых узких — только ▶ */
+.odds-row.t-common b { color: #d9d2c6; }
+.odds-row.t-rare b { color: #7cc0ff; }
+.odds-row.t-legend b { color: #ffd36b; text-shadow: 0 0 14px rgba(255,196,80,.5); }
+.odds-row.t-mythic b { color: #ff9be6; animation: roll-hue 2s linear infinite; }
+.odds-row.t-divine b { color: #fffdf7; text-shadow: 0 0 10px #fff, 0 0 26px rgba(255,215,130,.9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .roll::before, .cine.boom .rays, .cine.boom .stage, .c-mythic .ttl b { animation: none; }
+}

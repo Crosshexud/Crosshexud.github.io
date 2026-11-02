@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site/css/kir.css">
+<link rel="stylesheet" href="/site/css/roll.css">
 <style>
   .layout { display: grid; gap: 16px; }
   @media (min-width: 820px) {
@@ -19,9 +20,21 @@
   .frame { position: relative; cursor: pointer; touch-action: pan-y; }
   .frame canvas { transition: opacity .25s; }
   .frame.busy canvas { opacity: .35; }
-  .swipe { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #fff;
-           background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 999px; pointer-events: none; }
+  /* подсказка сверху — внизу картины своя табличка; после первого смахивания исчезает */
+  .swipe { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #fff; white-space: nowrap;
+           background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 999px; pointer-events: none; transition: opacity .4s; }
+  .frame.used .swipe { opacity: 0; }
   @media (hover: hover) { .swipe { display: none; } }
+  /* серии: название и материал в две строки; на телефоне — в два ряда */
+  .series { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }
+  .series button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1.15; padding: 8px 4px; }
+  .series small { font-size: 11px; font-weight: 500; color: var(--muted); }
+  @media (max-width: 520px) { .series { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* ролл редкости: настройки под сериями; пока крутится — название и свойства спрятаны, чтобы не подсмотреть */
+  .roll-opts { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+  .roll-opts .chip { cursor: pointer; font: inherit; font-size: 12.5px; }
+  .roll-opts .chip.off { opacity: .55; }
+  body.rolling #title, body.rolling #traits, body.rolling .plate, body.rolling #hist { visibility: hidden; }
   .title { font-family: var(--serif); font-style: italic; font-size: clamp(28px, 6vw, 40px); margin: 0 0 10px; }
   .hist { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
   .hist button { flex: none; width: 58px; aspect-ratio: 3/4; padding: 0; border: 2px solid transparent; border-radius: 8px;
@@ -48,8 +61,8 @@
 <main class="wrap">
   <div class="hero">
     <div class="eyebrow">Генератор</div>
-    <h1>Новые работы КИР</h1>
-    <p>Алгоритм собирает новую работу из картин автора. Каждая — единственная: её «зерно» записано в адресе страницы.</p>
+    <h1>Новые работы</h1>
+    <p>Выбери серию — алгоритм соберёт работу из картин автора, оформит фотографию или вырежет каменного идола. Каждая работа единственная: её «зерно» записано в адресе страницы.</p>
   </div>
   <div class="layout">
     <section class="art">
@@ -58,11 +71,19 @@
     </section>
     <section>
       <div class="card">
-        <div class="seg" style="margin-bottom:16px">
-          <button id="s-vg">Ван Гог · масло</button>
-          <button id="s-modi">Моди · карандаш</button>
+        <div class="seg series">
+          <button id="s-vg">Ван Гог<small>масло</small></button>
+          <button id="s-modi">Моди<small>карандаш</small></button>
+          <button id="s-bogomol">Богомол<small>фото</small></button>
+          <button id="s-hom">Хом<small>фото</small></button>
+          <button id="s-shumer">Шумеры<small>камень</small></button>
         </div>
-        <h2 class="title" id="title">загружаю картины…</h2>
+        <div class="roll-opts" id="rollOpts" hidden>
+          <button class="chip" id="o-roll"></button>
+          <button class="chip" id="o-sound"></button>
+          <button class="chip" id="o-odds">Шансы</button>
+        </div>
+        <h2 class="title" id="title">загружаю…</h2>
         <div class="chips" id="traits"></div>
         <div class="btns main-btns" style="margin-top:18px">
           <button class="btn" id="next">
@@ -106,6 +127,10 @@
   </form>
 </div>
 <script src="/site/js/pending.js"></script>
+<script src="/bogomol/engine.js"></script>
+<script src="/hom/engine.js"></script>
+<script src="/shumer/engine.js"></script>
+<script src="/site/js/roll.js"></script>
 <script>
 // ---------- случайность по зерну: одно и то же зерно = одна и та же работа ----------
 function mulberry32(a) {
@@ -130,7 +155,15 @@ const SOURCES = {
 const SERIES = {
   vg:   { name: "Ван Гог", sources: ["illyuzii", "vasilisa"], gray: false, paper: "#1a1714" },
   modi: { name: "Моди", sources: ["pomehi", "znamenosets"], gray: true, paper: "#eeeae2" },
+  bogomol: { name: "Богомол", sources: [], paper: "#0b0a09" }, // фото богомола, рисует /bogomol/engine.js
+  hom: { name: "Хом", sources: [], paper: "#efe6d2" }, // фото камней, рисует /hom/engine.js
+  shumer: { name: "Шумеры", sources: [], paper: "#0b0908" }, // каменные идолы с нуля, рисует /shumer/engine.js
 };
+// серии по фотографиям: свой «движок» у каждой
+const PHOTO = { bogomol: { E: () => BOGO, symbol: "BOGO", about: "настоящий богомол с фотографии, всё вокруг — алгоритм" },
+                hom: { E: () => HOM, symbol: "HOM", about: "алгоритм заново перерисовал фотографию по-своему" },
+                // фото не нужны — рисуется по-настоящему и на сайте
+                shumer: { E: () => SHUMER, symbol: "SHUM", about: "каменный идол, которого алгоритм «вырезал» сам", always: true } };
 const IMG = {};
 
 const W = 900, H = 1200;
@@ -293,8 +326,17 @@ const WORDS_B = ["скрипки", "башни", "младенца", "знаме
 // ---------- главная функция ----------
 let series = "vg", current = null;
 let SET = null; // готовые работы (remix/works) — на сайте без оригиналов генератор показывает их
+const LIVE = {}; // серии, которые рисуются по-настоящему (дома или в режиме автора); остальные — из SET
 function draw(seed) {
-  if (SET) return showWork(seed);
+  if (!LIVE[series]) return showWork(seed);
+  if (PHOTO[series]) return drawPhoto(seed);
+  const w = paintKir(seed);
+  describe({ seed, series, title: w.title, tech: w.tech, rarity: BOGO.RARITY_NAME[w.rarity] });
+  reveal();
+}
+
+// работа КИР прямо на главном холсте; возвращает название, технику и редкость
+function paintKir(seed) {
   R = mulberry32(seed);
   for (let i = 0; i < 8; i++) R(); // разгон: у близких зёрен первые числа почти одинаковые
   const s = SERIES[series];
@@ -303,8 +345,23 @@ function draw(seed) {
   TECHNIQUES[tech](s, s.sources);
   ctx.restore();
   finish(s);
+  const title = `${pick(WORDS_A)} ${pick(WORDS_B)}`;
+  const rarity = kirRarity(seed);
+  if (rarity !== "common") BOGO.rarityBorder(ctx, { rarity }, W, H); // таблички у картин КИР нет — только рамка
+  return { title, tech, rarity };
+}
+// редкость КИР — своей, отдельной случайностью: сами картины для тех же зёрен не меняются
+function kirRarity(seed) {
+  const r = BOGO.rng(seed ^ 0x2545f491);
+  for (let i = 0; i < 8; i++) r();
+  return BOGO.rarityOf(r());
+}
 
-  describe({ seed, series, title: `${pick(WORDS_A)} ${pick(WORDS_B)}`, tech });
+function drawPhoto(seed) {
+  const E = PHOTO[series].E(), w = E.randomWork(seed);
+  E.render(w, canvas, W, H, E.TECHS[w.tech]);
+  describe({ seed, series, title: w.title, tech: E.TECHS[w.tech], palette: w.palette, rarity: BOGO.RARITY_NAME[w.rarity],
+    ...(w.form && { form: E.FORMS[w.form], stone: w.stone }) });
   reveal();
 }
 
@@ -315,7 +372,7 @@ function showWork(seed) {
   return new Promise(res => {
     const im = new Image();
     im.onload = () => {
-      ctx.drawImage(im, 0, 0, W, H); describe({ seed: w.seed, series: w.s, title: w.title, tech: w.tech }); reveal(); res();
+      ctx.drawImage(im, 0, 0, W, H); describe({ seed: w.seed, series: w.s, title: w.title, tech: w.tech, palette: w.palette, rarity: w.rarity, form: w.form, stone: w.stone }); reveal(); res();
       nextUp = randomOf(series);
       new Image().src = `works/${series}-${nextUp}.webp`;
     };
@@ -325,6 +382,11 @@ function showWork(seed) {
 }
 function randomOf(s) {
   const own = SET.filter(w => w.s === s && !(current && w.seed === current.seed));
+  // если у работ есть редкость: сначала «выпадает» редкость с честными шансами, потом — готовая работа этой редкости
+  if (own.some(w => w.rarity)) {
+    const name = BOGO.RARITY_NAME[BOGO.rarityOf(Math.random())], same = own.filter(w => w.rarity === name);
+    if (same.length) return same[Math.floor(Math.random() * same.length)].seed;
+  }
   return own[Math.floor(Math.random() * own.length)].seed;
 }
 
@@ -360,13 +422,17 @@ function describe(work) {
   const s = SERIES[work.series];
   document.getElementById("title").textContent = `«${work.title}»`;
   document.getElementById("plateT").textContent = `«${work.title}»`;
-  document.getElementById("plateS").textContent = `КИР · ${s.name} · ${work.tech}`;
+  document.getElementById("plateS").textContent = PHOTO[work.series] ? `${s.name} · ${work.tech}` : `КИР · ${s.name} · ${work.tech}`;
   const chip = (k, v) => `<span class="chip">${k}: <b>${v}</b></span>`;
-  document.getElementById("traits").innerHTML = chip("серия", s.name) + chip("техника", work.tech) +
-    chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) + chip("зерно", work.seed);
+  document.getElementById("traits").innerHTML = PHOTO[work.series]
+    ? chip("коллекция", s.name) + (work.form ? chip("образ", work.form) + chip("камень", work.stone) : "") +
+      chip("техника", work.tech) + chip("палитра", work.palette) + chip("редкость", `${work.rarity} · ${KIRRoll.odds(KIRRoll.byName(work.rarity).id)}`) + chip("зерно", work.seed)
+    : chip("серия", s.name) + chip("техника", work.tech) +
+      chip("основа", s.sources.map(k => "«" + SOURCES[k].title + "»").join(", ")) +
+      (work.rarity ? chip("редкость", `${work.rarity} · ${KIRRoll.odds(KIRRoll.byName(work.rarity).id)}`) : "") + chip("зерно", work.seed);
   history.replaceState(null, "", `#${series}-${work.seed}`);
-  document.getElementById("s-vg").classList.toggle("on", series === "vg");
-  document.getElementById("s-modi").classList.toggle("on", series === "modi");
+  for (const k of Object.keys(SERIES)) document.getElementById("s-" + k).classList.toggle("on", series === k);
+  document.getElementById("rollOpts").hidden = !work.rarity; // у старых готовых работ без редкости ролла нет
   remember();
 }
 
@@ -384,7 +450,7 @@ function remember() {
     `<button data-i="${i}" class="${h.key === key ? "on" : ""}"><img src="${h.src}" alt=""></button>`).join("");
 }
 document.getElementById("hist").onclick = e => {
-  const b = e.target.closest("button[data-i]"); if (!b) return;
+  const b = e.target.closest("button[data-i]"); if (!b || rolling) return;
   const h = HIST[+b.dataset.i]; series = h.series; redraw(h.seed);
 };
 
@@ -396,42 +462,121 @@ function redraw(seed) {
 }
 
 function newSeed() {
-  if (!SET) return Math.floor(Math.random() * 1e9);
+  if (LIVE[series]) return Math.floor(Math.random() * 1e9);
   return nextUp && SET.some(w => w.s === series && w.seed === nextUp) ? nextUp : randomOf(series);
 }
 function download(name, url) {
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
 }
-const fileBase = () => `kir-${current.series}-${current.seed}`;
+const fileBase = () => PHOTO[current.series] ? `${current.series}-${current.seed}` : `kir-${current.series}-${current.seed}`;
 
-document.getElementById("next").onclick = () => redraw(newSeed());
-document.getElementById("s-vg").onclick = () => { series = "vg"; redraw(newSeed()); };
-document.getElementById("s-modi").onclick = () => { series = "modi"; redraw(newSeed()); };
+// ---------- ролл редкости (site/js/roll.js): у серий с редкостью новая работа «выпадает», как в играх ----------
+let rolling = false;
+async function roll() {
+  if (rolling) return KIRRoll.skip(); // повторное нажатие — пропустить анимацию
+  if (!KIRRoll.on) return redraw(newSeed());
+  rolling = true; document.body.classList.add("rolling");
+  const box = KIRRoll.begin(document.getElementById("frame"));
+  try {
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); // «барабан» успевает появиться
+    const quiet = window.NO_REVEAL; window.NO_REVEAL = true; // картину открывает ролл, сборка клетками не нужна
+    try { await draw(newSeed()); } finally { window.NO_REVEAL = quiet; }
+    await KIRRoll.finish(box, { rarity: KIRRoll.byName(current.rarity).id, canvas, title: current.title, collection: SERIES[series].name });
+  } finally {
+    box.remove(); document.body.classList.remove("rolling"); rolling = false;
+  }
+}
+function paintOpts() {
+  const r = document.getElementById("o-roll"), s = document.getElementById("o-sound");
+  r.textContent = `🎲 Ролл: ${KIRRoll.on ? "вкл" : "выкл"}`; r.classList.toggle("off", !KIRRoll.on);
+  s.textContent = `${KIRRoll.sound ? "🔊" : "🔇"} Звук: ${KIRRoll.sound ? "вкл" : "выкл"}`; s.classList.toggle("off", !KIRRoll.sound);
+}
+document.getElementById("o-roll").onclick = () => { KIRRoll.toggle("roll"); paintOpts(); };
+document.getElementById("o-sound").onclick = () => { KIRRoll.toggle("sound"); paintOpts(); };
+document.getElementById("o-odds").onclick = async () => {
+  const v = await KIRUI.sheet(`<div>
+  <div class="eyebrow">Шансы</div><h3 style="font-size:26px;margin-bottom:6px">Какая редкость выпадет</h3>
+  <p class="muted small" style="margin:0 0 10px">Одинаково для всех серий. Чем реже редкость, тем красивее рамка — и тем ярче сцена, когда она выпадает.</p>
+  <div class="odds-list">${KIRRoll.TIERS.map(t => `<div class="odds-row t-${t.id}"><b>${t.name}</b><span>${KIRRoll.odds(t.id)}</span>${
+    KIRRoll.BIG.includes(t.id) ? `<button class="chip" data-v="see-${t.id}" aria-label="смотреть">▶<span class="t"> смотреть</span></button>` : ""}</div>`).join("")}</div>
+  <p class="muted small" style="margin:10px 0 0">«Смотреть» — как выпадает эта редкость, на примере работы серии. Твоя работа в генераторе не изменится.</p>
+  <button class="btn ghost block" data-v="close" style="margin-top:14px">Закрыть</button></div>`);
+  if (v?.startsWith("see-")) preview(v.slice(4));
+};
+paintOpts();
+
+// показать, как выпадает редкость, без везения: образец рисуется отдельно, текущая работа и её NFT не меняются
+async function preview(id) {
+  if (rolling) return;
+  const sample = document.createElement("canvas"); sample.width = W; sample.height = H;
+  let title;
+  if (LIVE[series] && !PHOTO[series]) { // КИР рисует прямо на главном холсте: рисуем образец и возвращаем картину на место
+    stopReveal();
+    const keep = snapshot(); let seed;
+    do seed = Math.floor(Math.random() * 1e9); while (kirRarity(seed) !== id);
+    title = paintKir(seed).title;
+    sample.getContext("2d").drawImage(canvas, 0, 0); ctx.drawImage(keep, 0, 0);
+  } else if (LIVE[series]) { // серия рисуется по-настоящему — подбираем зерно с нужной редкостью
+    const E = PHOTO[series].E(); let w;
+    do w = E.randomWork(Math.floor(Math.random() * 1e9)); while (w.rarity !== id);
+    E.render(w, sample, W, H, E.TECHS[w.tech]); title = w.title;
+  } else { // на сайте — готовая работа этой редкости
+    const list = SET.filter(x => x.s === series && x.rarity === BOGO.RARITY_NAME[id]), w = list[Math.floor(Math.random() * list.length)];
+    if (!w) return;
+    const im = new Image(); im.src = `works/${series}-${w.seed}.webp`;
+    try { await im.decode(); } catch { return; }
+    sample.getContext("2d").drawImage(im, 0, 0, W, H); title = w.title;
+  }
+  rolling = true; document.body.classList.add("rolling");
+  const box = KIRRoll.begin(document.getElementById("frame"));
+  try { await KIRRoll.finish(box, { rarity: id, canvas: sample, title, collection: SERIES[series].name }); }
+  finally { box.remove(); document.body.classList.remove("rolling"); rolling = false; }
+}
+
+const pickSeries = s => { if (rolling) return KIRRoll.skip(); series = s; roll(); };
+document.getElementById("next").onclick = () => roll();
+for (const k of Object.keys(SERIES)) document.getElementById("s-" + k).onclick = () => pickSeries(k);
 // нажатие на картину или смахивание пальцем — новая работа
 (() => {
   const f = document.getElementById("frame");
   let x0 = null;
   f.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
   f.addEventListener("touchend", e => {
-    if (x0 !== null && Math.abs(e.changedTouches[0].clientX - x0) > 50) redraw(newSeed());
+    if (x0 !== null && Math.abs(e.changedTouches[0].clientX - x0) > 50) { f.classList.add("used"); roll(); }
     x0 = null;
   });
-  f.addEventListener("click", () => redraw(newSeed()));
+  f.addEventListener("click", () => { f.classList.add("used"); roll(); });
 })();
 // клавиатура: пробел или → — новая работа, ← — предыдущая
 document.addEventListener("keydown", e => {
   if (e.target.closest("input, textarea") || document.getElementById("lock").style.display === "flex") return;
   if (e.key === " " && e.target.closest("button, a")) return; // пробел на кнопке и так её нажимает
-  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); redraw(newSeed()); }
-  if (e.key === "ArrowLeft") {
+  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); roll(); }
+  if (e.key === "Escape" || e.key === "Enter") { if (rolling) { e.preventDefault(); KIRRoll.skip(); } }
+  if (e.key === "ArrowLeft" && !rolling) {
     const i = HIST.findIndex(h => h.key === `${current.series}-${current.seed}`), h = HIST[i + 1];
     if (h) { series = h.series; redraw(h.seed); }
   }
 });
-document.getElementById("save").onclick = () => { stopReveal(); download(`${fileBase()}.png`, canvas.toDataURL("image/png")); };
+document.getElementById("save").onclick = () => { if (rolling) return; stopReveal(); download(`${fileBase()}.png`, canvas.toDataURL("image/png")); };
 // метаданные в формате Metaplex (Solana) — понадобятся при создании NFT
 function metadata() {
   const s = SERIES[current.series];
+  if (PHOTO[current.series]) return {
+    name: current.title,
+    symbol: PHOTO[current.series].symbol,
+    description: `Работа коллекции «${s.name}»: ${PHOTO[current.series].about}.`,
+    image: `${fileBase()}.png`,
+    attributes: [
+      { trait_type: "Коллекция", value: s.name },
+      ...(current.form ? [{ trait_type: "Образ", value: current.form }, { trait_type: "Камень", value: current.stone }] : []),
+      { trait_type: "Техника", value: current.tech },
+      { trait_type: "Палитра", value: current.palette },
+      { trait_type: "Редкость", value: current.rarity },
+      { trait_type: "Зерно", value: String(current.seed) },
+    ],
+    properties: { category: "image", files: [{ uri: `${fileBase()}.png`, type: "image/png" }] },
+  };
   return {
     name: current.title,
     symbol: "KIR",
@@ -441,6 +586,7 @@ function metadata() {
       { trait_type: "Серия", value: `КИР: ${s.name}` },
       { trait_type: "Техника", value: current.tech },
       { trait_type: "Основа", value: s.sources.map(k => SOURCES[k].title).join(", ") },
+      ...(current.rarity ? [{ trait_type: "Редкость", value: current.rarity }] : []),
       { trait_type: "Зерно", value: String(current.seed) },
     ],
     properties: { category: "image", files: [{ uri: `${fileBase()}.png`, type: "image/png" }] },
@@ -452,12 +598,15 @@ document.getElementById("meta").onclick = () => {
 };
 // передаём работу в мастерскую NFT (работает, когда страница открыта через сервер: http://localhost:8080/remix/)
 document.getElementById("nft").onclick = () => {
+  if (rolling) return;
   if (!window.KIRPending) return alert("Открой генератор через сервер: http://localhost:8080/remix/");
   document.getElementById("nft").disabled = true;
   stopReveal();
   canvas.toBlob(async blob => {
     const meta = metadata(); delete meta.image; delete meta.properties;
-    await KIRPending.put({ bytes: new Uint8Array(await blob.arrayBuffer()), contentType: "image/png", fileName: `${fileBase()}.png`, metadata: meta });
+    // у каждой серии своя коллекция NFT; «Ван Гог» и «Моди» — это коллекция «КИР»
+    await KIRPending.put({ bytes: new Uint8Array(await blob.arrayBuffer()), contentType: "image/png", fileName: `${fileBase()}.png`, metadata: meta,
+      collection: PHOTO[current.series] ? current.series : "kir" });
     location.href = "/site/index.html";
   }, "image/png");
 };
@@ -476,7 +625,7 @@ async function unlock(pass) {
 function useArt(art) {
   return Promise.all(Object.keys(art).map(k => new Promise(res => {
     const im = new Image(); im.onload = () => { IMG[k] = im; res(); }; im.src = art[k];
-  }))).then(() => { SET = null; document.getElementById("author").style.display = "none"; });
+  }))).then(() => { LIVE.vg = LIVE.modi = true; document.getElementById("author").style.display = "none"; });
 }
 
 // режим автора: пароль → оригиналы → бесконечный генератор
@@ -503,9 +652,13 @@ document.getElementById("lockForm").onsubmit = async e => {
 // грузим картины (или набор готовых работ), потом рисуем
 (async () => {
   let saved = null; try { saved = sessionStorage.getItem("kir-pass"); } catch {}
-  if (typeof ART !== "undefined" && !/[?&]lock\b/.test(location.search)) await useArt(ART);
-  else if (!(saved && await tryPass(saved, true))) SET = await (await fetch("works/index.json")).json();
-  const m = location.hash.match(/^#(vg|modi)-(\d+)$/);
+  const home = !/[?&]lock\b/.test(location.search);
+  if (typeof ART !== "undefined" && home) await useArt(ART);
+  else if (saved) await tryPass(saved, true);
+  // фото лежат только дома; на сайте серии по фото — из готовых работ
+  await Promise.all(Object.keys(PHOTO).filter(k => home || PHOTO[k].always).map(k => PHOTO[k].E().ready().then(() => { LIVE[k] = true; }, () => {})));
+  if (!LIVE.vg || Object.keys(PHOTO).some(k => !LIVE[k])) SET = await (await fetch("works/index.json")).json();
+  const m = location.hash.match(/^#(vg|modi|bogomol|hom|shumer)-(\d+)$/);
   if (m) { series = m[1]; draw(Number(m[2])); } else draw(newSeed());
 })();
 </script>

@@ -45,16 +45,21 @@
   .tile .pic { position: relative; }
   .tag { position: absolute; left: 8px; top: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
          padding: 4px 9px; border-radius: 999px; background: var(--accent); color: #fff; }
+  /* фильтр по коллекциям */
+  #filter .chip { cursor: pointer; font: inherit; font-size: 12.5px; }
+  #filter .chip.on { background: var(--card-2); color: var(--fg); border-color: var(--line-2); }
+  #count { margin-left: auto; } /* счётчик — справа, рядом с «Обновить» */
 </style>
 </head>
 <body data-page="gallery">
 <main class="wrap">
   <div class="hero">
-    <div class="eyebrow">Коллекция «КИР»</div>
+    <div class="eyebrow">Все коллекции</div>
     <h1>Галерея</h1>
-    <p>Все NFT коллекции — прямо из блокчейна Solana.</p>
+    <p>NFT коллекций «КИР», «Богомол», «Хом» и «Шумеры» — прямо из блокчейна Solana.</p>
   </div>
   <div class="bar">
+    <div class="chips" id="filter" hidden></div>
     <span class="muted small" id="count"></span>
     <button class="btn sm" id="reload">Обновить</button>
   </div>
@@ -67,7 +72,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const { esc, short, toast } = KIRUI;
-let items = [];
+let items = [], show = 'all'; // show — ключ коллекции в фильтре или 'all'
 
 function skeleton(n = 8) {
   $('grid').innerHTML = Array.from({ length: n }, () =>
@@ -80,7 +85,7 @@ function empty() {
     <div class="card">
     <h2>Скоро здесь появятся работы</h2>
     <p class="muted">Первые NFT коллекции уже готовятся. А пока — посмотри, что умеет генератор.</p>
-    ${KIRUI.PUBLIC ? '' : '<a class="btn primary" href="/remix/">Создать первый NFT</a>'}</div></div>`;
+    <a class="btn primary" href="/remix/">Создать первый NFT</a></div></div>`;
   // за карточкой — приглушённая стена из работ генератора (на открытой версии их может не быть — тогда просто без стены)
   fetch('/remix/works/index.json').then(r => r.json()).then(all => {
     const pick = all.sort(() => Math.random() - 0.5).slice(0, 60);
@@ -91,25 +96,43 @@ function empty() {
 async function load() {
   skeleton();
   $('count').textContent = 'Загружаю из блокчейна…';
-  // адрес коллекции знает этот браузер; если нет — найдём по подключённому кошельку
-  if (!KIRMint.savedCollection()) await KIRMint.getCollection();
-  if (!KIRMint.savedCollection()) return empty();
+  $('filter').hidden = true;
   try {
-    items = await KIRMint.collectionAssets();
+    // NFT всех коллекций; адреса коллекций браузер помнит, а если нет — находит по кошельку автора
+    items = await KIRMint.allAssets();
   } catch (e) {
     $('count').textContent = '';
     $('grid').innerHTML = `<div class="card" style="grid-column:1/-1">Не удалось загрузить: ${esc(e.message || e)}</div>`;
     return;
   }
-  $('count').textContent = items.length ? `Работ: ${items.length}` : '';
   if (!items.length) return empty();
   auctionReady = await AU.ready();
-  $('grid').innerHTML = items.map((n, i) => `
-    <button class="tile" data-i="${i}">
-      <div class="pic">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}${onAuction(n) ? '<span class="tag">на аукционе</span>' : ''}</div>
-      <div class="cap"><b>${esc(n.name)}</b><span>${onAuction(n) ? 'идут торги' : n.owner === KIRMint.owner ? 'твоя' : 'владелец ' + short(n.owner)}</span></div>
+  // фильтр — только по коллекциям, где уже есть работы, и только если их больше одной
+  const has = Object.keys(KIRMint.COLLECTIONS).filter(k => items.some(n => n.series === k));
+  if (!has.includes(show)) show = 'all';
+  $('filter').hidden = has.length < 2;
+  $('filter').innerHTML = [['all', 'Все', items.length], ...has.map(k => [k, KIRMint.COLLECTIONS[k].name, items.filter(n => n.series === k).length])]
+    .map(([k, label, n]) => `<button class="chip ${k === show ? 'on' : ''}" data-f="${k}">${esc(label)} <b>${n}</b></button>`).join('');
+  paint();
+}
+
+function paint() {
+  const list = show === 'all' ? items : items.filter(n => n.series === show);
+  $('count').textContent = `Работ: ${list.length}`;
+  $('grid').innerHTML = list.map(n => `
+    <button class="tile" data-a="${esc(n.address)}">
+      <div class="pic">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('gone')">` : ''}${onAuction(n) ? '<span class="tag">на аукционе</span>' : ''}</div>
+      <div class="cap"><b>${esc(n.name)}</b><span>${esc(n.collectionName)} · ${onAuction(n) ? 'идут торги' : n.owner === KIRMint.owner ? 'твоя' : 'владелец ' + short(n.owner)}</span></div>
     </button>`).join('');
 }
+
+$('filter').onclick = e => {
+  const b = e.target.closest('[data-f]');
+  if (!b) return;
+  show = b.dataset.f;
+  $('filter').querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x === b));
+  paint();
+};
 
 // ---------- аукцион: NFT на торгах принадлежит счёту лота ----------
 const AU = KIRMint.auction;
@@ -138,21 +161,21 @@ async function sell(n) {
   if (!(min >= 0.001) || !(step >= 0.001)) return toast('Цена и шаг — не меньше 0.001 SOL', 'err');
   toast('Подтверди в Phantom…');
   try {
-    await AU.create({ asset: n.address, collection: KIRMint.savedCollection(), minBid: min, step, duration });
+    await AU.create({ asset: n.address, collection: n.collection, minBid: min, step, duration });
     toast('Работа выставлена на аукцион!', 'ok');
     location.href = '/site/auction.html#' + AU.addressOf(n.address);
   } catch (e) { toast('Не получилось: ' + esc(e.message || e), 'err', 9000); }
 }
 
 $('grid').onclick = e => {
-  const t = e.target.closest('.tile[data-i]');
+  const t = e.target.closest('.tile[data-a]');
   if (!t) return;
-  const n = items[+t.dataset.i];
+  const n = items.find(x => x.address === t.dataset.a);
   const mine = n.owner === KIRMint.owner, lot = onAuction(n);
   KIRUI.sheet(`
-    <div class="detail">${n.image ? `<img src="${esc(n.image)}" alt="">` : ''}</div>
+    <div class="detail">${n.image ? `<img src="${esc(n.image)}" alt="" onerror="this.parentNode.classList.add('gone')">` : ''}</div>
     <div>
-      <div class="eyebrow">КИР</div>
+      <div class="eyebrow">${esc(n.collectionName)}</div>
       <h2 style="font-size:34px">${esc(n.name)}</h2>
       ${n.description ? `<p class="muted">${esc(n.description)}</p>` : ''}
       <div class="chips">${n.attributes.map(a => `<span class="chip">${esc(a.trait_type)}: <b>${esc(a.value)}</b></span>`).join('')}</div>

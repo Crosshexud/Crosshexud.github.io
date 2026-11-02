@@ -1,5 +1,5 @@
 // Общие части всех страниц: шапка, нижнее меню, кнопка кошелька, всплывающие сообщения.
-// Страница ставит <body data-page="home|create|remix|gallery"> и подключает kir-mint.js перед этим файлом.
+// Страница ставит <body data-page="home|create|remix|gallery|auction"> и подключает kir-mint.js перед этим файлом.
 window.KIRUI = (() => {
   const ICONS = {
     auction: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5l6 6M12 6l6 6M10.5 7.5l6 6-3 3-6-6zM9 15l-6 6M3 21h9"/></svg>',
@@ -8,9 +8,7 @@ window.KIRUI = (() => {
     remix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>',
     gallery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
   };
-  const PUBLIC = !!window.KIR_CONFIG?.public;
-  // на открытом сайте генератора и создания нет — только галерея
-  const PAGES = PUBLIC ? [{ id: 'gallery', href: '/', label: 'Галерея' }] : [
+  const PAGES = [
     { id: 'home', href: '/', label: 'Главная' },
     { id: 'remix', href: '/remix/', label: 'Генератор' },
     { id: 'create', href: '/site/index.html', label: 'Создать NFT' },
@@ -36,8 +34,7 @@ window.KIRUI = (() => {
   const tabs = document.createElement('nav');
   tabs.className = 'tabs';
   tabs.innerHTML = PAGES.map(p => `<a href="${p.href}" class="${p.id === page ? 'on' : ''}">${ICONS[p.id]}<span>${p.label}</span></a>`).join('');
-  if (PUBLIC) document.body.classList.add('public'); // одна вкладка — нижнее меню не нужно
-  else document.body.append(tabs);
+  document.body.append(tabs);
 
   // подвал (на странице генератора не нужен — там всё в один экран)
   if (page !== 'remix') {
@@ -46,7 +43,7 @@ window.KIRUI = (() => {
     foot.innerHTML = `<div class="wrap">
       <a class="logo" href="/">К<span>И</span>Р</a>
       <nav>${PAGES.map(p => `<a href="${p.href}">${p.label}</a>`).join('')}</nav>
-      <p>Новые работы из картин автора · Solana · ${new Date().getFullYear()}</p></div>`;
+      <p>Новые работы КИР · пять коллекций · Solana · ${new Date().getFullYear()}</p></div>`;
     document.body.append(foot);
   }
 
@@ -136,5 +133,5 @@ window.KIRUI = (() => {
     });
   }
 
-  return { toast, sheet, connect, short, esc, ready, PUBLIC, refresh: () => paint(KIRMint.owner) };
+  return { toast, sheet, connect, short, esc, ready, refresh: () => paint(KIRMint.owner) };
 })();

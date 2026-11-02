@@ -1,37 +1,37 @@
 @echo off
-chcp 65001 >nul
-rem ╨Т╤Л╨║╨╗╨░╨┤╤Л╨▓╨░╨╡╤В ╨┐╤А╨╛╨│╤А╨░╨╝╨╝╤Г ╨░╤Г╨║╤Ж╨╕╨╛╨╜╨░ ┬л╨Ъ╨Ш╨а┬╗ ╨▓ ╨Ю╨б╨Э╨Ю╨Т╨Э╨г╨о ╤Б╨╡╤В╤М Solana (mainnet) тАФ ╨Э╨Р╨б╨в╨Ю╨п╨й╨Ш╨Х ╨Ф╨Х╨Э╨м╨У╨Ш.
-rem ╨Ч╨░╨┐╤Г╤Б╨║╨░╤В╤М ╤В╨╛╨╗╤М╨║╨╛ ╨┐╨╛╤Б╨╗╨╡ ╨░╤Г╨┤╨╕╤В╨░! ╨Я╨╛╨┤╤А╨╛╨▒╨╜╨╛╤Б╤В╨╕ тАФ auction\MAINNET.md
+rem Файл в кодировке 866 (DOS, русская) - редактировать в ней, иначе русский текст сломается.
+rem Выкладывает программу аукциона "КИР" в ОСНОВНУЮ сеть Solana (mainnet) - НАСТОЯЩИЕ ДЕНЬГИ.
+rem Запускать только после аудита! Подробности - auction\MAINNET.md
 cd /d "%~dp0auction"
 set PATH=C:\Users\cross\tools\solana\solana-release\bin;%PATH%
 echo.
-echo  ╨Т╨Э╨Ш╨Ь╨Р╨Э╨Ш╨Х: ╤Н╤В╨╛ ╨Ю╨б╨Э╨Ю╨Т╨Э╨Р╨п ╤Б╨╡╤В╤М Solana. ╨С╤Г╨┤╤Г╤В ╨┐╨╛╤В╤А╨░╤З╨╡╨╜╤Л ╨╜╨░╤Б╤В╨╛╤П╤Й╨╕╨╡ SOL (╨╛╨║╨╛╨╗╨╛ 0.45, ╤З╨░╤Б╤В╤М ╨▓╨╡╤А╨╜╤С╤В╤Б╤П).
-echo  ╨Я╤А╨╛╨│╤А╨░╨╝╨╝╤Г ╨┐╨╡╤А╨╡╨┤ ╤Н╤В╨╕╨╝ ╨┤╨╛╨╗╨╢╨╡╨╜ ╨┐╤А╨╛╨▓╨╡╤А╨╕╤В╤М ╨░╤Г╨┤╨╕╤В╨╛╤А (auction\MAINNET.md).
+echo  ВНИМАНИЕ: это ОСНОВНАЯ сеть Solana. Будут потрачены настоящие SOL (около 0.45, часть вернётся).
+echo  Программу перед этим должен проверить аудитор (auction\MAINNET.md).
 echo.
-set /p A=╨Р╤Г╨┤╨╕╤В ╨┐╤А╨╛╨╣╨┤╨╡╨╜ ╨╕ ╤В╤Л ╤Е╨╛╤З╨╡╤И╤М ╨▓╤Л╨╗╨╛╨╢╨╕╤В╤М? ╨Э╨░╨┐╨╕╤И╨╕ ╨Ф╨Р (╨╕╨╗╨╕ DA): 
+set /p A=Аудит пройден и ты хочешь выложить? Напиши ДА (или DA): 
 set OK=
-for %%w in (╨Ф╨Р DA YES) do if /i "%A%"=="%%w" set OK=1
+for %%w in (ДА DA YES) do if /i "%A%"=="%%w" set OK=1
 if not defined OK goto stop
 echo.
-echo ╨б╨╗╤Г╨╢╨╡╨▒╨╜╤Л╨╣ ╨║╨╛╤И╨╡╨╗╤С╨║ (╨╜╨░ ╨╜╨╡╨│╨╛ ╨╜╤Г╨╢╨╜╨╛ ╨┐╨╡╤А╨╡╨▓╨╡╤Б╤В╨╕ ╨╛╨║╨╛╨╗╨╛ 0.5 SOL ╨▓ ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨╣ ╤Б╨╡╤В╨╕):
+echo Служебный кошелёк (на него нужно перевести около 0.5 SOL в основной сети):
 solana address -k keys\deployer.json
-echo ╨С╨░╨╗╨░╨╜╤Б ╨▓ ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨╣ ╤Б╨╡╤В╨╕:
+echo Баланс в основной сети:
 solana balance -k keys\deployer.json -u mainnet-beta
 echo.
-set /p B=╨в╨╛╤З╨╜╨╛ ╨▓╤Л╨║╨╗╨░╨┤╤Л╨▓╨░╤О ╨▓ mainnet? ╨Э╨░╨┐╨╕╤И╨╕ ╨Ф╨Р ╨╡╤Й╤С ╤А╨░╨╖ (╨╕╨╗╨╕ DA): 
+set /p B=Точно выкладываю в mainnet? Напиши ДА ещё раз (или DA): 
 set OK=
-for %%w in (╨Ф╨Р DA YES) do if /i "%B%"=="%%w" set OK=1
+for %%w in (ДА DA YES) do if /i "%B%"=="%%w" set OK=1
 if not defined OK goto stop
 solana program deploy program\target\deploy\kir_auction.so --program-id keys\program.json -k keys\deployer.json -u mainnet-beta --with-compute-unit-price 20000 --max-sign-attempts 30 --use-rpc
 if errorlevel 1 (
   echo.
-  echo ╨Э╨╡ ╨┐╨╛╨╗╤Г╤З╨╕╨╗╨╛╤Б╤М. ╨Я╤А╨╛╨▓╨╡╤А╤М ╨▒╨░╨╗╨░╨╜╤Б ╤Б╨╗╤Г╨╢╨╡╨▒╨╜╨╛╨│╨╛ ╨║╨╛╤И╨╡╨╗╤М╨║╨░ ╨╕ ╨╖╨░╨┐╤Г╤Б╤В╨╕ ╨╡╤Й╤С ╤А╨░╨╖ тАФ ╤Г╨╢╨╡ ╨╖╨░╨│╤А╤Г╨╢╨╡╨╜╨╜╨░╤П ╤З╨░╤Б╤В╤М ╨╜╨╡ ╨┐╨╛╤В╨╡╤А╤П╨╡╤В╤Б╤П.
+  echo Не получилось. Проверь баланс служебного кошелька и запусти ещё раз - уже загруженная часть не потеряется.
 ) else (
   echo.
-  echo ╨У╨╛╤В╨╛╨▓╨╛! ╨Ф╨░╨╗╤М╤И╨╡ тАФ ╤И╨░╨│╨╕ 4тАУ9 ╨▓ auction\MAINNET.md: ╨┐╤А╨░╨▓╨░ ╨╜╨░ ╨╛╨▒╨╜╨╛╨▓╨╗╨╡╨╜╨╕╨╡, ╨║╨╗╤О╤З RPC, cluster: 'mainnet-beta' ╨▓ site\js\config.js.
+  echo Готово! Дальше - шаги 4-9 в auction\MAINNET.md: права на обновление, ключ RPC, cluster: 'mainnet-beta' в site\js\config.js.
 )
 goto end
 :stop
-echo ╨Ю╤В╨╝╨╡╨╜╨╡╨╜╨╛, ╨╜╨╕╤З╨╡╨│╨╛ ╨╜╨╡ ╤Б╨┤╨╡╨╗╨░╨╜╨╛.
+echo Отменено, ничего не сделано.
 :end
 pause

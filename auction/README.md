@@ -28,7 +28,8 @@ cd ../tests && npm install && node client.test.mjs
 ```
 `sim/fixtures/mpl_core.so` (не в git): `solana program dump CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d sim/fixtures/mpl_core.so -u devnet`.
 
-Выложить в Devnet: перевести ~0.5 SOL на служебный кошелёк (`solana address -k keys/deployer.json`) и запустить `ВЫЛОЖИТЬ-АУКЦИОН.bat` в корне проекта.
+В Devnet программа уже выложена. Обновить её после правок (нужно ~0.5 SOL на служебном кошельке `solana address -k keys/deployer.json`):
+`solana program deploy program/target/deploy/kir_auction.so --program-id keys/program.json -k keys/deployer.json -u devnet` (из папки `auction`).
 
 ## Перед mainnet — обязательно аудит
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0a09">
 <title>КИР — новые работы авангарда</title>
-<meta name="description" content="Алгоритм собирает новые работы из картин автора КИР. Каждая — единственная и навсегда записана в блокчейне Solana.">
+<meta name="description" content="Алгоритм собирает новые работы из картин автора КИР, оформляет фотографии и вырезает каменных идолов. Каждая — единственная и навсегда записана в блокчейне Solana.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
@@ -26,6 +26,7 @@
   .stack::before { /* красный круг за картинами */
     content: ""; position: absolute; width: 78%; aspect-ratio: 1; border-radius: 50%; background: var(--accent);
     right: -16%; top: -9%; filter: saturate(1.1); animation: float 9s ease-in-out infinite; }
+  @media (max-width: 560px) { .stack::before { right: -6%; } } /* иначе на телефоне круг вылезает за край экрана */
   .stack::after { /* чёрная диагональ */
     content: ""; position: absolute; left: -22%; bottom: 12%; width: 70%; height: 14px; background: var(--fg);
     transform: rotate(-24deg); opacity: .9; }
@@ -63,7 +64,7 @@
   .sec-h h2 { font-family: var(--display); font-weight: 600; font-size: clamp(26px, 4.6vw, 42px); letter-spacing: -.025em; line-height: 1.05; }
   .sec-h p { color: var(--muted); margin: 0; max-width: 420px; }
 
-  /* две серии */
+  /* серии */
   .series { display: grid; gap: 16px; }
   @media (min-width: 820px) { .series { grid-template-columns: 1fr 1fr; gap: 20px; } }
   .ser { display: grid; grid-template-columns: 1fr; text-decoration: none; color: var(--fg); padding: 0; overflow: hidden; transition: border-color .3s, transform .3s var(--ease); }
@@ -71,6 +72,10 @@
   .ser .fan { position: relative; height: 250px; overflow: hidden; }
   .ser.modi .fan { background: linear-gradient(180deg, #e9e3d8, #d9d2c5); }
   .ser.vg .fan { background: linear-gradient(180deg, #2a1d18, #1a1311); }
+  .ser.bogomol .fan { background: linear-gradient(180deg, #1d2b17, #10170c); }
+  .ser.hom .fan { background: linear-gradient(180deg, #e8dcc4, #cdbb9a); }
+  .ser.shumer .fan { background: linear-gradient(180deg, #13286b, #0b1238); }
+  @media (min-width: 820px) { .ser.shumer { grid-column: 1 / -1; } }
   .ser .fan img { position: absolute; width: 150px; aspect-ratio: 3 / 4; object-fit: cover; left: 50%; top: 34px; border-radius: 4px;
                   box-shadow: 0 18px 30px -10px rgba(0,0,0,.7); transition: transform .5s var(--ease); }
   .ser .fan img:nth-child(1) { transform: translateX(-125%) rotate(-10deg); }
@@ -124,8 +129,8 @@
   <section class="intro">
     <div>
       <div class="eyebrow rv">Аукционный дом авангарда · Solana</div>
-      <h1 class="rv" style="--d:.08s">Новые работы <em>из картин КИР</em></h1>
-      <p class="lead rv" style="--d:.16s">Алгоритм разбирает картины автора на мозаику, калейдоскоп, коллаж и разлом — и собирает из них новые. Каждая работа единственная и навсегда записывается в блокчейн.</p>
+      <h1 class="rv" style="--d:.08s">Новые работы <em>от КИР</em></h1>
+      <p class="lead rv" style="--d:.16s">Алгоритм собирает новые работы из картин автора, оформляет фотографии и сам вырезает каменных идолов — пять серий, бесконечно разных. Каждая работа единственная и навсегда записывается в блокчейн.</p>
       <div class="btns rv" style="--d:.24s">
         <a class="btn primary" href="/remix/">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>
@@ -141,14 +146,14 @@
   <div class="marquee rv" id="marquee"><div class="row"></div><div class="row"></div></div>
 
   <div class="stats rv">
-    <div><b>4</b><span>картины автора в основе</span></div>
-    <div><b>4</b><span>техники: мозаика, калейдоскоп, коллаж, разлом</span></div>
-    <div><b>2</b><span>серии: «Ван Гог» и «Моди»</span></div>
+    <div><b>4</b><span>картины автора и 3 фотографии в основе</span></div>
+    <div><b>19</b><span>техник: от мозаики и разлома до витража и тепловизора</span></div>
+    <div><b>5</b><span>серий: «Ван Гог», «Моди», «Богомол», «Хом» и «Шумеры»</span></div>
     <div><b class="red">∞</b><span>новых работ — ни одна не повторяется</span></div>
   </div>
 
   <section class="sec">
-    <div class="sec-h rv"><h2>Две серии</h2><p>Масло и карандаш. Алгоритм бережно сохраняет почерк автора, но каждый раз собирает его заново.</p></div>
+    <div class="sec-h rv"><h2>Пять серий</h2><p>Масло, карандаш, две коллекции по фотографиям и каменные идолы. Алгоритм каждый раз собирает работу заново.</p></div>
     <div class="series">
       <a class="card ser vg rv" id="ser-vg" href="/remix/">
         <div class="fan"></div>
@@ -162,13 +167,31 @@
           <p>Графит и штриховка из рисунков 2024 и 2025 годов — мозаика и дерево.</p>
           <span class="go">Создать работу →</span></div>
       </a>
+      <a class="card ser bogomol rv" id="ser-bogomol" href="/remix/">
+        <div class="fan"></div>
+        <div class="txt"><h3>Богомол <small>фото</small></h3>
+          <p>Настоящий богомол с осенней прогулки — а мир вокруг него каждый раз другой: неон, глитч, ночь, голограмма.</p>
+          <span class="go">Создать работу →</span></div>
+      </a>
+      <a class="card ser hom rv" id="ser-hom" href="/remix/" style="--d:.1s">
+        <div class="fan"></div>
+        <div class="txt"><h3>Хом <small>фото</small></h3>
+          <p>Камни степи, заново перерисованные алгоритмом: мазками, витражом, гравюрой, точками.</p>
+          <span class="go">Создать работу →</span></div>
+      </a>
+      <a class="card ser shumer rv" id="ser-shumer" href="/remix/">
+        <div class="fan"></div>
+        <div class="txt"><h3>Шумеры <small>камень</small></h3>
+          <p>Маски, идолы и звери, которых алгоритм сам «вырезает» из змеевика, яшмы, известняка — а редким достаются лазурит и золото.</p>
+          <span class="go">Создать работу →</span></div>
+      </a>
     </div>
   </section>
 
   <section class="sec">
     <div class="sec-h rv"><h2>Как это работает</h2><p>Без сложностей: три шага от идеи до NFT в твоём кошельке.</p></div>
     <div class="how">
-      <div class="card rv"><h3>Генератор собирает работу</h3><p>Нажимаешь «Новая» — алгоритм выбирает технику и строит работу из картин автора.</p></div>
+      <div class="card rv"><h3>Генератор собирает работу</h3><p>Выбираешь серию и нажимаешь «Новая» — алгоритм выбирает технику и собирает работу: из картин автора, по фотографии или вырезая идола из камня.</p></div>
       <div class="card rv" style="--d:.1s"><h3>Хранилище помнит навсегда</h3><p>Картинка и описание сохраняются в Arweave — их нельзя удалить или подменить.</p></div>
       <div class="card rv" style="--d:.2s"><h3>NFT становится твоим</h3><p>Работа записывается в блокчейн Solana и лежит в кошельке Phantom. Автор получает 5% с перепродаж.</p></div>
     </div>
@@ -229,7 +252,7 @@ fetch('/remix/works/index.json').then(r => r.json()).then(all => {
   });
 
   // веер из трёх работ на карточке серии
-  for (const s of ['vg', 'modi']) {
+  for (const s of ['vg', 'modi', 'bogomol', 'hom', 'shumer']) {
     const three = of(s).slice(0, 3), card = document.getElementById('ser-' + s);
     card.querySelector('.fan').innerHTML = three.map(w => `<img src="${thumb(w)}" alt="">`).join('');
     card.href = link(three[1]);

@@ -13,9 +13,19 @@ import { makeAuction, explainError, LAMPORTS } from '../../auction/client/kir-au
 // сеть берётся из site/js/config.js: 'devnet' (тестовая) или 'mainnet-beta' (настоящие деньги)
 const CLUSTER = window.KIR_CONFIG?.cluster || 'devnet';
 const RPC = window.KIR_CONFIG?.rpc || (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com');
-const STORE_KEY = 'kir-collection-' + CLUSTER;
-const COLLECTION_NAME = 'КИР';
+// коллекции сайта: у каждой серии генератора своя (vg и modi — это «КИР»)
+const COLLECTIONS = {
+  kir:     { name: 'КИР',     symbol: 'KIR',  description: 'Коллекция новых работ, созданных алгоритмом на основе картин автора КИР.' },
+  bogomol: { name: 'Богомол', symbol: 'BOGO', description: 'Настоящий богомол с осенней фотографии — а мир вокруг него каждый раз рисует алгоритм.' },
+  hom:     { name: 'Хом',     symbol: 'HOM',  description: 'Камни степи, заново перерисованные алгоритмом: мазками, витражом, гравюрой, точками.' },
+  shumer:  { name: 'Шумеры',  symbol: 'SHUM', description: 'Каменные маски, идолы и звери, которых алгоритм «вырезает» сам — в духе древних шумерских фигурок.' },
+};
+// адрес коллекции «КИР» хранится под старым ключом — чтобы браузеры, где она уже записана, не искали её заново
+const storeKey = key => key === 'kir' ? 'kir-collection-' + CLUSTER : `kir-collection-${key}-${CLUSTER}`;
 const ROYALTY = 500; // 5% автору с каждой перепродажи
+// хранилище картинок выбираем по нашей настройке сети, а не по адресу узла: в тестовой сети — бесплатное временное
+// (файлы живут около 60 дней), в основной — постоянное Arweave (≈ 0.00006 SOL за картинку 2 МБ)
+const STORAGE = CLUSTER === 'devnet' ? 'https://devnet.irys.xyz' : 'https://uploader.irys.xyz';
 
 // без кошелька — только чтение (галерея); после connect() — с подписью через Phantom
 let umi = createUmi(RPC, 'confirmed').use(mplCore());
@@ -35,7 +45,7 @@ function attach(p) {
     signAllTransactions: txs => p.signAllTransactions(txs),
     signMessage: async msg => (await p.signMessage(msg)).signature,
   };
-  umi = createUmi(RPC, 'confirmed').use(mplCore()).use(irysUploader()).use(walletAdapterIdentity(adapter));
+  umi = createUmi(RPC, 'confirmed').use(mplCore()).use(irysUploader({ address: STORAGE })).use(walletAdapterIdentity(adapter));
   owner = umi.identity.publicKey.toString();
   emit();
   return owner;
@@ -75,65 +85,84 @@ async function uploadImage(bytes, fileName, contentType) {
 }
 const uploadJson = async json => fixUri(await umi.uploader.uploadJson(json));
 
-function savedCollection() {
-  try { return localStorage.getItem(STORE_KEY); } catch { return null; }
+function savedCollection(key = 'kir') {
+  try { return localStorage.getItem(storeKey(key)); } catch { return null; }
 }
-function setCollection(addr) {
-  try { localStorage.setItem(STORE_KEY, addr); } catch {}
+function setCollection(addr, key = 'kir') {
+  try { localStorage.setItem(storeKey(key), addr); } catch {}
 }
 
-// коллекция «КИР»: адрес из памяти браузера, а если его нет — ищем в блокчейне среди коллекций
-// подключённого кошелька или автора из site/js/config.js (так её находят посетители открытого сайта)
-async function getCollection() {
-  const addr = savedCollection();
+// наши коллекции в блокчейне — по названию среди коллекций подключённого кошелька
+// или автора из site/js/config.js (так их находят посетители без кошелька): { kir: коллекция, … }
+async function findCollections() {
+  const author = window.KIR_CONFIG?.author;
+  const found = {};
+  for (const w of [...new Set([owner, author].filter(Boolean))]) {
+    let list = [];
+    try { list = await fetchCollectionsByUpdateAuthority(umi, publicKey(w)); } catch {}
+    for (const [key, c] of Object.entries(COLLECTIONS)) found[key] ||= list.find(x => x.name === c.name);
+  }
+  return found;
+}
+
+// коллекция серии: адрес из памяти браузера, а если его нет — ищем в блокчейне
+async function getCollection(key = 'kir') {
+  const addr = savedCollection(key);
   if (addr) {
     try { return await fetchCollection(umi, publicKey(addr)); } catch {}
   }
-  const author = window.KIR_CONFIG?.author;
-  const who = [...new Set([owner, author].filter(Boolean))];
-  try {
-    let found = null;
-    for (const w of who) {
-      found = (await fetchCollectionsByUpdateAuthority(umi, publicKey(w))).find(c => c.name === COLLECTION_NAME);
-      if (found) break;
-    }
-    if (found) { setCollection(found.publicKey.toString()); return found; }
-  } catch {}
+  const found = (await findCollections())[key];
+  if (found) { setCollection(found.publicKey.toString(), key); return found; }
   return null;
 }
 
-async function createKirCollection({ imageBytes, contentType = 'image/png', onStep = () => {} }) {
+// адреса всех уже созданных коллекций: { kir: 'адрес', … }
+async function allCollections() {
+  const out = {};
+  for (const key of Object.keys(COLLECTIONS)) { const a = savedCollection(key); if (a) out[key] = a; }
+  if (Object.keys(out).length < Object.keys(COLLECTIONS).length) {
+    for (const [key, c] of Object.entries(await findCollections())) {
+      if (c && !out[key]) { out[key] = c.publicKey.toString(); setCollection(out[key], key); }
+    }
+  }
+  return out;
+}
+
+async function createCollectionFor({ key = 'kir', imageBytes, contentType = 'image/png', onStep = () => {} }) {
+  const c = COLLECTIONS[key];
   onStep('upload', 'Загружаю обложку в вечное хранилище');
-  const image = await uploadImage(imageBytes, 'kir-cover.png', contentType);
+  const image = await uploadImage(imageBytes, `${key}-cover.png`, contentType);
   onStep('meta', 'Сохраняю описание коллекции');
   const uri = await uploadJson({
-    name: COLLECTION_NAME,
-    symbol: 'KIR',
-    description: 'Коллекция новых работ, созданных алгоритмом на основе картин автора КИР.',
+    name: c.name,
+    symbol: c.symbol,
+    description: c.description,
     image,
     properties: { category: 'image', files: [{ uri: image, type: contentType }] },
   });
   onStep('chain', 'Записываю коллекцию в Solana');
   const collection = generateSigner(umi);
   const { signature } = await createCollection(umi, {
-    collection, name: COLLECTION_NAME, uri,
+    collection, name: c.name, uri,
     plugins: [{ type: 'Royalties', basisPoints: ROYALTY, creators: [{ address: umi.identity.publicKey, percentage: 100 }], ruleSet: ruleSet('None') }],
   }).sendAndConfirm(umi);
   const addr = collection.publicKey.toString();
-  setCollection(addr);
+  setCollection(addr, key);
   onStep('done', 'Готово');
   return { address: addr, link: explorer(addr), signature };
 }
 
-// metadata — в формате Metaplex (как скачивает генератор ремиксов), поле image подставляется само
-async function mint({ imageBytes, contentType = 'image/png', fileName = 'kir.png', metadata, onStep = () => {} }) {
-  const coll = await getCollection();
-  if (!coll) throw new Error('Сначала создай коллекцию «КИР».');
+// metadata — в формате Metaplex (как скачивает генератор ремиксов), поле image подставляется само;
+// collection — ключ коллекции серии ('kir', 'bogomol', 'hom', 'shumer')
+async function mint({ collection = 'kir', imageBytes, contentType = 'image/png', fileName = 'kir.png', metadata, onStep = () => {} }) {
+  const c = COLLECTIONS[collection];
+  const coll = await getCollection(collection);
+  if (!coll) throw new Error(`Сначала создай коллекцию «${c.name}».`);
   onStep('upload', 'Загружаю картинку в вечное хранилище');
   const image = await uploadImage(imageBytes, fileName, contentType);
   onStep('meta', 'Сохраняю описание NFT');
   const uri = await uploadJson({
-    symbol: 'KIR',
+    symbol: c.symbol,
     ...metadata,
     image,
     properties: { category: 'image', files: [{ uri: image, type: contentType }] },
@@ -159,6 +188,14 @@ async function collectionAssets(addr = savedCollection()) {
     };
   }));
   return items.reverse();
+}
+
+// NFT всех коллекций; у каждого — адрес коллекции, её ключ и название
+async function allAssets() {
+  const cols = await allCollections();
+  const lists = await Promise.all(Object.keys(COLLECTIONS).filter(k => cols[k]).map(async key =>
+    (await collectionAssets(cols[key])).map(n => ({ ...n, collection: cols[key], series: key, collectionName: COLLECTIONS[key].name }))));
+  return lists.flat();
 }
 
 // ---------- аукцион (программа auction/program; адрес — в site/js/config.js) ----------
@@ -242,8 +279,8 @@ const auction = {
 };
 
 window.KIRMint = {
-  connect, autoConnect, disconnect, balance, getCollection, createKirCollection, mint, collectionAssets,
-  explorer, savedCollection, setCollection, auction,
+  connect, autoConnect, disconnect, balance, getCollection, createCollection: createCollectionFor, mint, collectionAssets,
+  allCollections, allAssets, explorer, savedCollection, setCollection, auction, COLLECTIONS,
   get owner() { return owner; },
   onChange(f) { listeners.add(f); return () => listeners.delete(f); },
   cluster: CLUSTER,

@@ -6,10 +6,8 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 
-// `node server.js --dist` — посмотреть открытую версию (папку dist) на http://localhost:8081
-const DIST = process.argv.includes('--dist');
-const ROOT = path.resolve(__dirname, DIST ? '../dist' : '..');
-const PORT = DIST ? 8081 : 8080;
+const ROOT = path.resolve(__dirname, '..');
+const PORT = 8080;
 const LAN = process.argv.includes('--lan');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css',
@@ -18,7 +16,7 @@ const TYPES = {
 
 http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (p === '/') p = DIST ? '/index.html' : '/site/home.html';
+  if (p === '/') p = '/site/home.html';
   let file = path.join(ROOT, p);
   if (!file.startsWith(ROOT) || file.includes('node_modules')) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');

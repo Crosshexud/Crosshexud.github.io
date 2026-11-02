@@ -35,7 +35,7 @@
   <div class="hero">
     <div class="eyebrow">Мастерская</div>
     <h1>Создать NFT</h1>
-    <p>Работа навсегда сохраняется в хранилище Arweave и становится NFT в твоей коллекции «КИР» на Solana.</p>
+    <p>Работа навсегда сохраняется в хранилище Arweave и становится NFT в коллекции своей серии — «КИР», «Богомол», «Хом» или «Шумеры» — на Solana.</p>
   </div>
 
   <div class="layout">
@@ -87,12 +87,18 @@
 <script>
 const $ = id => document.getElementById(id);
 const { toast, esc } = KIRUI;
-let work = null;       // { bytes, contentType, fileName, metadata }
-let collection = null; // коллекция «КИР», если уже есть
+let work = null;       // { bytes, contentType, fileName, metadata, collection }
+let collection = null; // коллекция серии этой работы, если уже есть
 let busy = false;
+// у каждой серии своя коллекция; работа без пометки (или без работы) — «КИР»
+const key = () => work?.collection || 'kir';
+const cname = () => KIRMint.COLLECTIONS[key()].name;
 
 // ---------- верхняя карточка: что нужно сделать сейчас ----------
+// кошелёк и работа приходят одновременно, поэтому проверок может идти несколько — верим только последней
+let gateRun = 0;
 async function renderGate() {
+  const run = ++gateRun;
   const g = $('gate');
   if (!KIRMint.owner) {
     collection = null;
@@ -103,15 +109,18 @@ async function renderGate() {
     return update();
   }
   g.innerHTML = `<div class="muted small">Проверяю коллекцию…</div>`;
-  collection = await KIRMint.getCollection();
+  collection = null; update();
+  const found = await KIRMint.getCollection(key());
+  if (run !== gateRun) return; // пока искали, сменилась работа или кошелёк — ответ устарел
+  collection = found;
   if (!collection) {
     g.innerHTML = `<div class="notice" style="margin:0"><span class="ico">🗂️</span><div>
-      <h3>Создай коллекцию «КИР»</h3><p>Это делается один раз. Все твои NFT будут лежать в ней, а выбранная работа станет обложкой.</p>
+      <h3>Создай коллекцию «${esc(cname())}»</h3><p>Это делается один раз. Все NFT этой серии будут лежать в ней, а выбранная работа станет обложкой.</p>
       <button class="btn primary" id="gColl" ${work ? '' : 'disabled'}>Создать коллекцию</button>
       ${work ? '' : '<p class="small" style="margin:8px 0 0">Сначала выбери работу в генераторе — она станет обложкой.</p>'}</div></div>`;
     $('gColl').onclick = makeCollection;
   } else {
-    g.innerHTML = `<div class="stat"><span>Коллекция <b>«КИР»</b> · работ: ${collection.numMinted ?? 0}</span>
+    g.innerHTML = `<div class="stat"><span>Коллекция <b>«${esc(cname())}»</b> · работ: ${collection.numMinted ?? 0}</span>
       <a class="small" href="/site/gallery.html">Галерея →</a></div>`;
   }
   update();
@@ -134,8 +143,8 @@ function stepper(active) {
 async function makeCollection() {
   busy = true; $('gColl').disabled = true; update();
   try {
-    await KIRMint.createKirCollection({ imageBytes: work.bytes, contentType: work.contentType, onStep: s => stepper(s) });
-    toast('Коллекция «КИР» создана!', 'ok');
+    await KIRMint.createCollection({ key: key(), imageBytes: work.bytes, contentType: work.contentType, onStep: s => stepper(s) });
+    toast(`Коллекция «${esc(cname())}» создана!`, 'ok');
   } catch (e) { toast('Не получилось: ' + esc(e.message || e), 'err', 9000); console.error(e); }
   busy = false; $('steps').hidden = true;
   KIRUI.refresh(); renderGate();
@@ -161,7 +170,7 @@ $('mint').onclick = async () => {
   try {
     const meta = { ...work.metadata, name, description: $('desc').value.trim() };
     delete meta.image; delete meta.properties;
-    const r = await KIRMint.mint({ imageBytes: work.bytes, contentType: work.contentType, fileName: work.fileName, metadata: meta, onStep: s => stepper(s) });
+    const r = await KIRMint.mint({ collection: key(), imageBytes: work.bytes, contentType: work.contentType, fileName: work.fileName, metadata: meta, onStep: s => stepper(s) });
     KIRUI.refresh();
     const v = await KIRUI.sheet(`
       <img src="${URL.createObjectURL(new Blob([work.bytes], { type: work.contentType }))}" alt="" style="border-radius:12px;width:100%;aspect-ratio:3/4;object-fit:cover;background:#050505">

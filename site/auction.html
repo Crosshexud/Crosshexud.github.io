@@ -85,7 +85,7 @@
   <div class="hero">
     <div class="eyebrow">Торги · Solana</div>
     <h1>Аукцион</h1>
-    <p>Работы КИР уходят тому, кто предложит больше. Ставки в SOL хранит программа в блокчейне — никто не может их забрать или подменить.</p>
+    <p>Работы всех коллекций — «КИР», «Богомол», «Хом» и «Шумеры» — уходят тому, кто предложит больше. Ставки в SOL хранит программа в блокчейне — никто не может их забрать или подменить.</p>
   </div>
   <div class="bar" id="bar" hidden>
     <div class="seg"><button id="f-live" class="on">Идут торги</button><button id="f-done">Завершены</button></div>
@@ -139,7 +139,7 @@ async function load() {
   $('bar').hidden = false;
   if (!lots.length) $('list').innerHTML = `<div class="grid">${Array.from({ length: 4 }, () => '<div class="card lotc"><div class="pic skeleton"></div><div class="info"><div class="skeleton" style="height:20px;border-radius:4px"></div></div></div>').join('')}</div>`;
   try {
-    const [l, items] = await Promise.all([AU.lots(), art.size ? null : KIRMint.collectionAssets().catch(() => [])]);
+    const [l, items] = await Promise.all([AU.lots(), art.size ? null : KIRMint.allAssets().catch(() => [])]);
     lots = l.sort((a, b) => a.endTs - b.endTs);
     if (items) items.forEach(n => art.set(n.address, n));
   } catch (e) {
@@ -164,10 +164,10 @@ function render() {
     const n = art.get(l.asset.toBase58()), s = left(l);
     const me = mine(l.highestBidder) ? 'лидируешь' : mine(l.seller) ? 'твой лот' : '';
     return `<button class="card lotc rv" data-a="${l.address.toBase58()}">
-      <div class="pic">${n?.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}
+      <div class="pic">${n?.image ? `<img src="${esc(n.image)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('gone')">` : ''}
         <span class="badge ${s > 0 ? 'live' : ''}">${s > 0 ? 'идут торги' : 'ждёт завершения'}</span>
         ${me ? `<span class="badge me">${me}</span>` : ''}</div>
-      <div class="info"><div class="nm">${esc(n?.name || 'Работа КИР')}</div>
+      <div class="info"><div class="nm">${esc(n?.name || 'Работа')}</div>
         <div class="row2"><div><small>${l.highestBidder ? 'ставка' : 'старт'}</small><b>${sol(l.highestBidder ? l.highestBid : l.minBid)} SOL</b></div>
         <div class="t ${s > 0 && s < 3600 ? "hot" : ""}"><small>${l.bidCount} ${plural(l.bidCount)}</small><b data-end="${l.endTs}">${hms(s)}</b></div></div></div>
     </button>`;
@@ -222,10 +222,10 @@ async function showLot(address) {
        <p class="small muted" style="margin:10px 0 0" id="mybid">Деньги лежат на твоём личном счёте ставки. Если тебя перебьют — заберёшь их кнопкой «Забрать».</p>`;
 
   const p = KIRUI.sheet(`
-    <div class="detail"><div class="frame">${n.image ? `<img src="${esc(n.image)}" alt="">` : '<div class="empty">NFT</div>'}</div></div>
+    <div class="detail"><div class="frame">${n.image ? `<img src="${esc(n.image)}" alt="" onerror="this.parentNode.classList.add('gone')">` : '<div class="empty">NFT</div>'}</div></div>
     <div>
       <div class="eyebrow">${ended ? 'Торги закончились' : 'Идут торги'}</div>
-      <h2 style="font-size:32px;font-style:italic">${esc(n.name || 'Работа КИР')}</h2>
+      <h2 style="font-size:32px;font-style:italic">${esc(n.name || 'Работа')}</h2>
       <div style="margin-top:14px"><small class="muted small">${l.highestBidder ? 'Текущая ставка' : 'Стартовая цена'}</small>
         <div class="big">${sol(l.highestBidder ? l.highestBid : l.minBid)} SOL</div></div>
       <div class="clock" id="clk"></div>

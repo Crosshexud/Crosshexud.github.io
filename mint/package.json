@@ -6,9 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "esbuild src/kir-mint.js --bundle --minify --format=iife --platform=browser --target=firefox115 --inject:src/shims.js --define:global=globalThis --alias:stream=stream-browserify --alias:crypto=crypto-browserify --alias:vm=vm-browserify --outfile=../site/js/kir-mint.js",
-    "start": "node server.js",
-    "pack": "node pack.js",
-    "deploy": "node pack.js && wrangler pages deploy ../dist --project-name kir-gallery --branch main --commit-dirty=true"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -28,7 +26,6 @@
     "events": "^3.3.0",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5",
-    "vm-browserify": "^1.1.2",
-    "wrangler": "^4.153.0"
+    "vm-browserify": "^1.1.2"
   }
 }

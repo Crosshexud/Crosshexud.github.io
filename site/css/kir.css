@@ -82,6 +82,14 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: .01em;
 .wallet .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .wallet.on .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 .wallet .bal { color: var(--muted); font-weight: 500; }
+/* на узком экране кнопка кошелька сжимается (адрес — с многоточием), а не выталкивает шапку за край */
+.wallet { min-width: 0; }
+.wallet .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) {
+  .top { gap: 8px; }
+  .net { font-size: 9.5px; letter-spacing: .08em; padding: 3px 7px; }
+  .wallet .bal { display: none; }
+}
 
 /* ---------- нижнее меню (телефон) ---------- */
 .tabs {
@@ -101,8 +109,6 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: .01em;
 .dock { position: fixed; left: 0; right: 0; z-index: 19; bottom: calc(var(--nav-h) + var(--safe-b)); display: flex; gap: 10px;
         padding: 12px 16px; background: linear-gradient(transparent, rgba(11,10,9,.96) 35%); }
 .dock .btn { flex: 1; }
-body.public { padding-bottom: 32px; }
-body.public .toasts { bottom: 24px; }
 body.has-dock { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 90px); }
 
 @media (min-width: 820px) {
@@ -211,6 +217,14 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+
+/* картинка NFT пропала: в тестовой сети хранилище удаляет файлы примерно через 60 дней (в основной — навсегда) */
+.gone { position: relative; min-height: 120px; }
+.gone > img { display: none; }
+.detail.gone { aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; } /* в окне работы — на месте картины */
+.gone::after { content: "Картинка из тестовой сети уже удалена"; position: absolute; inset: 0; display: grid; place-items: center; padding: 12px;
+               text-align: center; font-size: 12px; line-height: 1.4; color: var(--muted);
+               background: repeating-linear-gradient(45deg, #0d0c0b 0 10px, #131110 10px 20px); }
 
 /* ---------- рамка картины: музейная рама с паспарту ---------- */
 .frame { position: relative; border-radius: 6px; overflow: hidden; aspect-ratio: 3 / 4; display: grid; place-items: center;
